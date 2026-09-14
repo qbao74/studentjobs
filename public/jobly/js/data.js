@@ -1,13 +1,23 @@
 /**
- * Jobly — Mock data
- * File này chứa toàn bộ dữ liệu giả (jobs, user, companies, chat).
- * Sau này có thể thay bằng API Laravel: fetch('/api/jobs') rồi gán vào cùng cấu trúc.
+ * Jobly — Mock data (dữ liệu giả)
+ *
+ * File này KHÔNG vẽ giao diện. Chỉ khai báo biến để app.js đọc.
+ * Giống bảng SQL đã SELECT sẵn, nhét cứng vào JS.
+ *
+ * SỬA GÌ Ở ĐÂY:
+ * - Đổi tên sinh viên, trường, skill  → object USER bên dưới
+ * - Thêm/sửa việc làm                 → mảng JOBS (mỗi {} là 1 job)
+ * - Thêm công ty                      → object COMPANIES
+ * - Chat / đơn apply / review         → CONVERSATIONS, APPLICATIONS, REVIEWS
+ *
+ * Sau này Laravel: bỏ các const này, fetch('/api/jobs') rồi gán cùng cấu trúc.
  */
 
+/** Hồ sơ user đang đăng nhập — trang Home (“Chào Bảo”) và Profile đọc cái này */
 const USER = {
   id: "u1",
-  name: "Lê Bảo",
-  firstName: "Bảo",
+  name: "Lê Bảo", // tên đầy đủ (sidebar, profile)
+  firstName: "Bảo", // tên ngắn — tiêu đề Home
   year: "Sinh viên năm 2",
   school: "Đại học Công Nghệ",
   major: "Công nghệ thông tin",
@@ -17,10 +27,10 @@ const USER = {
   bio: "Sinh viên năm 2, thích UI/UX và frontend. Muốn tìm việc part-time để học hỏi và tích lũy kinh nghiệm thực tế.",
   avatar:
     "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&w=400&q=80",
-  skills: ["PHP", "JavaScript", "SQL", "HTML/CSS", "Figma"],
+  skills: ["PHP", "JavaScript", "SQL", "HTML/CSS", "Figma"], // mảng string — trang Profile
   cvFile: "CV_Bao.pdf",
   cvUpdated: "Cập nhật 3 ngày trước",
-  profileScore: 82,
+  profileScore: 82, // % vòng tròn AI trên rail
   stats: {
     applied: 12,
     interviewed: 5,
@@ -29,6 +39,11 @@ const USER = {
   },
 };
 
+/**
+ * Danh sách công ty. Đây là object (không phải array):
+ * key = id ("may-creative"), value = thông tin công ty.
+ * So sánh PHP: $COMPANIES['may-creative']['name']
+ */
 const COMPANIES = {
   "may-creative": {
     id: "may-creative",
@@ -148,6 +163,12 @@ const COMPANIES = {
   },
 };
 
+/**
+ * Danh sách việc làm — array (mảng). Mỗi phần tử {} là 1 job.
+ * id phải UNIQUE. companyId phải khớp key trong COMPANIES.
+ * match = % phù hợp (số). image = URL ảnh bìa thẻ.
+ * Home / Explore / Chi tiết đều đọc mảng này.
+ */
 const JOBS = [
   {
     id: 1,
@@ -582,6 +603,7 @@ const REVIEWS = [
   },
 ];
 
+/** Tìm 1 job theo id. Number(id) vì URL luôn là chuỗi ("1"), còn job.id là số */
 function getJobById(id) {
   return JOBS.find((job) => job.id === Number(id));
 }
@@ -593,6 +615,7 @@ const DEFAULT_COVERS = [
   "https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=1600&q=80",
 ];
 
+/** Lấy công ty theo id. Nếu thiếu cover/jobsCount thì tự gán mặc định rồi trả về */
 function getCompany(companyId) {
   const c = COMPANIES[companyId];
   if (!c) return undefined;
@@ -605,10 +628,12 @@ function getCompany(companyId) {
   return c;
 }
 
+/** Tất cả job thuộc 1 công ty — trang /companies */
 function jobsByCompany(companyId) {
   return JOBS.filter((job) => job.companyId === companyId);
 }
 
+/** Đổi % match thành high/mid/low — CSS dùng data-tone để tô màu viên thuốc */
 function matchTone(percent) {
   if (percent >= 88) return "high";
   if (percent >= 75) return "mid";

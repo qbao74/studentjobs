@@ -1,6 +1,25 @@
 /* ============================================================
-   JOBLY — Design System
-   Swipe • Match • Build Your Future
+   JOBLY — Design System (hệ thống giao diện)
+
+   File này CHỈ lo hình thức: màu, khoảng cách, bố cục.
+   File JS lo hành vi: click, vuốt, đổ dữ liệu vào HTML.
+
+   CÁCH SỬA NHANH (Ctrl+F tên class hoặc nhảy mục lục):
+   - Đổi màu chủ đạo / chữ / nền     → mục 01 TOKENS  (:root)
+   - Đổi font chữ toàn site          → --font trong :root
+   - Độ rộng sidebar / cột phải      → --sidebar-w / --rail-w
+   - Menu trái                       → mục 05 .sidebar
+   - Nút bấm, chip lọc               → mục 06 .btn .filter-chip
+   - Tiêu đề trang (Chào Bảo…)       → mục 07 .page-head .page-title
+   - Thẻ vuốt trang Home             → mục 08 .job-card
+   - Dòng việc trang Khám phá        → mục 10 .job-row
+   - Trang chat                      → mục 13 .chat-layout
+   - Menu dưới điện thoại            → mục 17 .bottom-nav
+   - Giao diện hẹp (mobile)          → mục 19 @media
+
+   Class (lớp CSS) = tên gắn trên HTML, ví dụ class="btn".
+   Muốn đổi 1 nút: tìm .btn — dấu chấm = “class tên btn”.
+   var(--primary) = lấy màu từ :root. Đổi 1 lần ở :root, cả site đổi theo.
 
    Mục lục
    01 Tokens            08 Job card + swipe (Home)
@@ -18,53 +37,58 @@
    ============================================================ */
 
 /* ------------------------------------------------------------
-   01 TOKENS
+   01 TOKENS — biến màu / khoảng cách toàn site
+   :root = “gốc trang”. Custom property (biến CSS) bắt đầu bằng --
+   Chỗ khác viết var(--primary) nghĩa là “dùng màu --primary ở đây”.
+   Sửa HEX ở đây thì nút, sidebar, thanh tiến trình… đổi theo.
    ------------------------------------------------------------ */
 :root {
-  --bg: #f7f8fc;
-  --surface: #ffffff;
-  --surface-2: #f2f4fb;
-  --text: #141a33;
-  --muted: #6b7591;
-  --border: rgba(20, 26, 51, 0.06);
+  --bg: #f7f8fc;                 /* nền trang */
+  --surface: #ffffff;            /* nền thẻ / card trắng */
+  --surface-2: #f2f4fb;          /* nền phụ, xám rất nhạt */
+  --text: #141a33;               /* chữ chính (gần đen) */
+  --muted: #6b7591;              /* chữ phụ, mô tả mờ */
+  --border: rgba(20, 26, 51, 0.06); /* viền mỏng */
 
-  --primary: #6366f1;
-  --primary-2: #8b5cf6;
-  --primary-dark: #4f46e5;
-  --primary-soft: #eef0ff;
+  --primary: #6366f1;            /* tím indigo — màu thương hiệu */
+  --primary-2: #8b5cf6;          /* tím phụ (gradient) */
+  --primary-dark: #4f46e5;       /* tím đậm, hover nút */
+  --primary-soft: #eef0ff;       /* nền tím rất nhạt */
   --primary-grad: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
 
-  --blue: #3b82f6;
+  --blue: #3b82f6;               /* icon verified, link */
   --mint: #2dd4bf;
   --pink: #f472b6;
-  --success: #22c55e;
+  --success: #22c55e;            /* xanh — apply / thành công */
   --success-soft: #e8f9ee;
-  --warning: #f59e0b;
+  --warning: #f59e0b;            /* vàng — cảnh báo */
   --warning-soft: #fff4e0;
-  --danger: #ef4444;
+  --danger: #ef4444;             /* đỏ — skip / xóa */
   --danger-soft: #feecec;
 
-  --shadow-sm: 0 2px 10px rgba(20, 26, 51, 0.04);
+  --shadow-sm: 0 2px 10px rgba(20, 26, 51, 0.04);   /* bóng nhẹ */
   --shadow: 0 10px 34px rgba(99, 102, 241, 0.08);
-  --shadow-lg: 0 20px 56px rgba(99, 102, 241, 0.14);
+  --shadow-lg: 0 20px 56px rgba(99, 102, 241, 0.14); /* bóng thẻ lớn */
 
-  --r-xl: 28px;
+  --r-xl: 28px;                  /* border-radius (bo góc) lớn */
   --r-lg: 22px;
   --r-md: 16px;
   --r-sm: 12px;
 
-  --sidebar-w: 272px;
-  --rail-w: 352px;
-  --bottom-nav-h: 74px;
+  --sidebar-w: 272px;            /* độ rộng menu trái — tăng/giảm ở đây */
+  --rail-w: 352px;               /* độ rộng cột phải (AI / gợi ý) */
+  --bottom-nav-h: 74px;          /* chiều cao menu điện thoại */
 
-  --ease: cubic-bezier(0.22, 1, 0.36, 1);
-  --t: 0.25s var(--ease);
+  --ease: cubic-bezier(0.22, 1, 0.36, 1); /* đường cong animation */
+  --t: 0.25s var(--ease);        /* thời gian chuyển động mặc định */
 
   --font: "Plus Jakarta Sans", "Inter", system-ui, sans-serif;
 }
 
 /* ------------------------------------------------------------
-   02 BASE
+   02 BASE — reset (đặt lại) HTML mặc định của trình duyệt
+   box-sizing: border-box = padding không làm phình width.
+   body lấy màu/chữ từ var(--text) var(--bg) ở mục 01.
    ------------------------------------------------------------ */
 *,
 *::before,
@@ -152,7 +176,9 @@ svg {
 }
 
 /* ------------------------------------------------------------
-   03 BACKGROUND DECORATION
+   03 BACKGROUND — lớp nền blob (vệt màu mờ) sau toàn app
+   HTML: div.app-bg trong layout. pointer-events: none = không chặn click.
+   Đổi màu vệt: .blob-1 (tím) và .blob-2 (mint).
    ------------------------------------------------------------ */
 .app-bg {
   position: fixed;
@@ -201,7 +227,11 @@ svg {
 }
 
 /* ------------------------------------------------------------
-   04 LAYOUT SHELL
+   04 LAYOUT SHELL — khung 2 hoặc 3 cột
+   .app              = sidebar + main
+   .app.has-rail     = thêm cột phải (.rail) — trang chat KHÔNG có class này
+   display: grid     = chia cột; độ rộng lấy --sidebar-w / --rail-w
+   .main             = vùng nội dung từng trang (@yield content)
    ------------------------------------------------------------ */
 .app {
   position: relative;
@@ -253,7 +283,9 @@ svg {
 }
 
 /* ------------------------------------------------------------
-   05 SIDEBAR
+   05 SIDEBAR — menu trái (HTML #sidebar do JS đổ vào)
+   .logo .nav-item .ai-card .sidebar-user
+   is-active = mục đang chọn (JS gắn class khi data-page khớp).
    ------------------------------------------------------------ */
 .sidebar {
   position: sticky;
@@ -481,7 +513,10 @@ svg {
 }
 
 /* ------------------------------------------------------------
-   06 BUTTONS / CHIPS / BADGES
+   06 BUTTONS / CHIPS — nút, chip lọc, badge
+   .btn-primary = tím đặc    .btn-soft = nền nhạt    .btn-ghost = trong suốt
+   .filter-chip = “Part-time / Remote…” trang Explore
+   .chip .skill-tag .match-pill
    ------------------------------------------------------------ */
 .btn {
   display: inline-flex;
@@ -765,7 +800,9 @@ svg {
 }
 
 /* ------------------------------------------------------------
-   07 PAGE HEADER
+   07 PAGE HEADER — hàng tiêu đề mỗi trang
+   .page-title = chữ lớn (“Chào Bảo”)   .page-sub = dòng mô tả
+   .search-bar = ô tìm   .head-tools = chuông thông báo
    ------------------------------------------------------------ */
 .page-head {
   display: flex;
@@ -890,7 +927,8 @@ svg {
 }
 
 /* ------------------------------------------------------------
-   07b RIGHT RAIL COMPONENTS
+   07b RIGHT RAIL — widget cột phải (JS nhét HTML vào #rail)
+   .ai-profile-card = thẻ AI tím   .suggest-item = việc gợi ý
    ------------------------------------------------------------ */
 .ai-profile-card {
   padding: 20px;
@@ -1206,7 +1244,11 @@ svg {
 }
 
 /* ------------------------------------------------------------
-   08 HOME — JOB CARD + SWIPE
+   08 HOME — thẻ việc + hiệu ứng vuốt
+   .card-stack = chồng thẻ   .job-card.is-front = thẻ trên cùng
+   .swipe-label--apply / --skip = chữ Nhận / Bỏ khi kéo
+   .action-btn = 3 nút dưới thẻ (JS swipe.js đổi transform)
+   Chỉ ăn khi body[data-page="home"]
    ------------------------------------------------------------ */
 body[data-page="home"] .main {
   display: flex;
@@ -1560,7 +1602,8 @@ body[data-page="home"] .page-head {
 }
 
 /* ------------------------------------------------------------
-   09 AI MATCH OVERLAY (modal / bottom sheet)
+   09 AI MATCH OVERLAY — popup “Vì sao phù hợp”
+   .overlay.is-open mới hiện (JS thêm class). Không sửa JS thì đừng xóa .overlay.
    ------------------------------------------------------------ */
 .overlay {
   position: fixed;
@@ -1612,7 +1655,9 @@ body[data-page="home"] .page-head {
 }
 
 /* ------------------------------------------------------------
-   10 EXPLORE — JOB ROWS
+   10 EXPLORE — danh sách việc (mỗi dòng một job)
+   .job-row = 1 việc   .chip-row = hàng nút lọc
+   HTML #job-list để trống, app.js mới đổ .job-row vào.
    ------------------------------------------------------------ */
 .chip-row {
   display: flex;
@@ -1719,7 +1764,8 @@ body[data-page="home"] .page-head {
 }
 
 /* ------------------------------------------------------------
-   11 JOB DETAIL
+   11 JOB DETAIL — trang /jobs (chi tiết 1 việc)
+   .detail-hero .detail-cover = ảnh đầu trang
    ------------------------------------------------------------ */
 .detail-hero {
   overflow: hidden;
@@ -1821,7 +1867,8 @@ body[data-page="home"] .page-head {
 }
 
 /* ------------------------------------------------------------
-   12 MATCH SUCCESS
+   12 MATCH SUCCESS — màn hình sau khi bấm Nhận/Apply
+   .match-screen .confetti
    ------------------------------------------------------------ */
 body[data-page="match"] .main {
   display: flex;
@@ -1967,7 +2014,10 @@ body[data-page="match"] .main {
 }
 
 /* ------------------------------------------------------------
-   13 CHAT
+   13 CHAT — 3 cột: danh sách hội thoại | khung chat | info
+   .chat-layout = grid 3 cột   .conv-list .chat-shell .chat-info
+   .chat-thread = vùng tin nhắn cuộn   .chat-input = ô gửi
+   Mobile: mục 19 ẩn cột, class .show-list do JS gắn.
    ------------------------------------------------------------ */
 body[data-page="chat"] .app .main {
   padding-bottom: 28px;
@@ -2753,7 +2803,8 @@ body[data-page="chat"] .app .main {
 }
 
 /* ------------------------------------------------------------
-   14 APPLICATIONS TIMELINE
+   14 APPLICATIONS — tiến trình ứng tuyển
+   .app-card = 1 đơn   .timeline / .step = các bước (done / current / upcoming)
    ------------------------------------------------------------ */
 .app-list {
   display: flex;
@@ -2897,7 +2948,9 @@ body[data-page="chat"] .app .main {
 }
 
 /* ------------------------------------------------------------
-   15 PROFILE
+   15 PROFILE — hồ sơ sinh viên
+   .profile-hero .profile-avatar .skill-tag .cv-card
+   Nội dung chữ lấy từ USER trong data.js, CSS chỉ lo khung.
    ------------------------------------------------------------ */
 .profile-hero {
   overflow: hidden;
@@ -3065,7 +3118,8 @@ body[data-page="chat"] .app .main {
 }
 
 /* ------------------------------------------------------------
-   16 COMPANY
+   16 COMPANY — trang công ty
+   .company-hero .company-cover .tabs .review
    ------------------------------------------------------------ */
 .company-hero {
   overflow: hidden;
@@ -3231,6 +3285,9 @@ body[data-page="chat"] .app .main {
 
 /* ------------------------------------------------------------
    17 BOTTOM NAV / SHEET / TOAST
+   .bottom-nav mặc định display:none — mục 19 mới hiện trên mobile
+   .toast = thông báo đáy màn hình (JS hàm toast())
+   .sheet-backdrop = lớp mờ khi mở rail trên điện thoại
    ------------------------------------------------------------ */
 .bottom-nav {
   display: none;
@@ -3344,7 +3401,9 @@ body[data-page="chat"] .app .main {
 }
 
 /* ------------------------------------------------------------
-   18 ANIMATIONS
+   18 ANIMATIONS — @keyframes (khung hình chuyển động)
+   Tên như pageIn, toastOut được class khác gọi qua animation: ...
+   Ít khi cần sửa trừ khi đổi tốc độ / kiểu bay của thẻ.
    ------------------------------------------------------------ */
 @keyframes pageIn {
   from {
@@ -3470,7 +3529,10 @@ body[data-page="chat"] .app .main {
 }
 
 /* ------------------------------------------------------------
-   19 RESPONSIVE
+   19 RESPONSIVE — màn hình hẹp
+   @media (max-width: …) = “chỉ khi cửa sổ hẹp hơn X px thì áp dụng”.
+   Đây là chỗ ẩn sidebar, hiện .bottom-nav, xếp chat 1 cột.
+   Test: thu nhỏ cửa sổ trình duyệt, không sửa HTML.
    ------------------------------------------------------------ */
 @media (max-height: 880px) and (min-width: 961px) {
   .card-cover {
