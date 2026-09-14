@@ -1,6 +1,10 @@
 /**
  * Jobly — UI + navigation
  *
+ * File này điều khiển toàn bộ giao diện frontend (SPA-lite theo từng Blade page).
+ * Dữ liệu đang lấy từ data.js (USER, JOBS, COMPANIES, CONVERSATIONS…).
+ * Trạng thái apply/skip/save/follow lưu localStorage qua Store — chưa gọi API.
+ *
  * Cấu trúc:
  *  1. Store        — localStorage (applied / skipped / saved / followed)
  *  2. Helpers      — qs, escapeHtml, toast, icons
@@ -9,6 +13,7 @@
  *  5. Job UI       — swipe card, job row, AI match modal
  *  6. Pages        — initHome / initExplore / initDetail / initMatch / initChat /
  *                    initApplications / initProfile / initCompany
+ *  7. Boot         — DOMContentLoaded: vẽ shell rồi chạy init theo data-page
  *
  * Kết nối Laravel sau này: thay JOBS/USER/… (data.js) bằng fetch API,
  * và thay Store.* bằng POST /api/applications, /api/saved-jobs...
@@ -16,6 +21,8 @@
 
 /* =========================================================
    1. STORE
+   Lớp mỏng trên localStorage. Mỗi key là mảng id (job hoặc company).
+   Set dùng để không lưu trùng. Sau này thay bằng API + session user.
    ========================================================= */
 const Store = {
   key: {
@@ -24,6 +31,7 @@ const Store = {
     saved: "jobly_saved",
     followed: "jobly_followed",
   },
+  /** Đọc mảng JSON; lỗi parse → [] để UI không vỡ */
   read(key) {
     try {
       return JSON.parse(localStorage.getItem(key) || "[]");
@@ -49,6 +57,7 @@ const Store = {
   addSkipped(id) {
     this.write(this.key.skipped, [...new Set([...this.skipped(), Number(id)])]);
   },
+  /** Bật/tắt lưu job; trả về true nếu sau thao tác job đang được lưu */
   toggleSaved(id) {
     const ids = new Set(this.saved());
     const n = Number(id);
@@ -72,6 +81,9 @@ const Store = {
 
 /* =========================================================
    2. HELPERS
+   NAV / MOBILE_NAV: menu desktop vs 5 tab dưới mobile.
+   qs/qsa/param: rút gọn DOM + query string.
+   escapeHtml: bắt buộc khi nhét text user/mock vào innerHTML.
    ========================================================= */
 const NAV = [
   { id: "home", href: "/", label: "Home", icon: "house" },
@@ -81,6 +93,7 @@ const NAV = [
   { id: "chat", href: "/chat", label: "Tin nhắn", icon: "message-circle", badge: 3 },
 ];
 
+// Bottom nav mobile: Home, Explore, Applications, Chat, Profile (không có mục Saved riêng)
 const MOBILE_NAV = [
   NAV[0],
   NAV[1],
@@ -92,6 +105,7 @@ const MOBILE_NAV = [
 const qs = (sel, root = document) => root.querySelector(sel);
 const qsa = (sel, root = document) => [...root.querySelectorAll(sel)];
 const param = (name) => new URLSearchParams(location.search).get(name);
+/** Vẽ lại icon Lucide sau khi innerHTML (data-lucide chỉ là placeholder) */
 const icons = () => window.lucide?.createIcons();
 
 function escapeHtml(str) {
@@ -106,11 +120,13 @@ function icon(name) {
   return `<i data-lucide="${name}"></i>`;
 }
 
+/** Ô logo công ty = chữ cái + màu brand (không dùng ảnh thật) */
 function logoHtml(company, cls = "") {
   const c = typeof company === "string" ? getCompany(company) : company;
   return `<div class="company-logo ${cls}" style="background:${c.color}">${c.initial}</div>`;
 }
 
+/** Nút % phù hợp; data-open-match mở modal AI (bindGlobalClicks) */
 function matchPill(job, extra = "") {
   return `<button class="match-pill ${extra}" type="button" data-tone="${matchTone(job.match)}" data-open-match="${job.id}">
     ${icon("thumbs-up")} ${job.match}% phù hợp
@@ -121,7 +137,7 @@ function verifiedHtml(company) {
   return company.verified ? `<span class="verified">${icon("badge-check")}</span>` : "";
 }
 
-/** Toast notification nhẹ ở đáy màn hình */
+/** Toast notification nhẹ ở đáy màn hình — tự ẩn sau ~2.2s */
 function toast(message, iconName = "check") {
   let stack = qs("#toast-stack");
   if (!stack) {
@@ -139,7 +155,7 @@ function toast(message, iconName = "check") {
   window.setTimeout(() => el.remove(), 2600);
 }
 
-/** Đếm số tăng dần cho AI score */
+/** Đếm số tăng dần cho AI score (ease-out cubic, 900ms) */
 function animateNumber(el, target, suffix = "") {
   const start = performance.now();
   const dur = 900;
@@ -152,6 +168,7 @@ function animateNumber(el, target, suffix = "") {
   requestAnimationFrame(tick);
 }
 
+/** Vòng tròn % — CSS biến --p điều khiển stroke; data-score để animateRings đọc */
 function scoreRing(value, id = "") {
   return `<div class="score-ring" ${id ? `id="${id}"` : ""} style="--p:0" data-score="${value}">
     <strong>0%</strong>
@@ -170,6 +187,8 @@ function animateRings(root = document) {
 
 /* =========================================================
    3. SHELL — sidebar / bottom nav / rail sheet
+   Vẽ khung dùng chung mọi trang. body[data-page] quyết định mục nav active.
+   Rail desktop = cột phải; mobile = FAB + bottom sheet.
    ========================================================= */
 function activeNavId() {
   const page = document.body.dataset.page;
@@ -225,6 +244,7 @@ function renderShell() {
         </a>
         <a class="icon-btn icon-btn--ghost" href="/profile" aria-label="Cài đặt">${icon("settings")}</a>
       </div>`;
+    // Animate thanh progress sau khi DOM gắn (width 0 → data-w)
     requestAnimationFrame(() =>
       qsa(".progress-bar span[data-w]").forEach((s) => (s.style.width = `${s.dataset.w}%`))
     );
@@ -236,7 +256,7 @@ function renderShell() {
     ).join("");
   }
 
-  // Rail → bottom sheet trên màn hình hẹp
+  // Rail → bottom sheet trên màn hình hẹp (FAB sparkles + backdrop)
   const rail = qs("#rail");
   if (rail) {
     const fab = document.createElement("button");
@@ -255,7 +275,7 @@ function renderShell() {
     backdrop.addEventListener("click", () => toggle(false));
   }
 
-  // Overlay AI match dùng chung
+  // Overlay AI match dùng chung mọi trang (mở bằng [data-open-match])
   if (!qs("#match-overlay")) {
     const ov = document.createElement("div");
     ov.className = "overlay";
@@ -267,6 +287,8 @@ function renderShell() {
 
 /* =========================================================
    4. RAIL WIDGETS (tái sử dụng)
+   Cột phải / bottom sheet. Mỗi trang gọi fillRail() với tổ hợp widget khác nhau.
+   Dữ liệu vẫn từ USER / JOBS / getJobById — sau này swap sang API.
    ========================================================= */
 const Rail = {
   aiProfile() {
@@ -292,6 +314,7 @@ const Rail = {
       </section>`;
   },
 
+  /** 3 job gợi ý; ids mặc định [2,3,5]; excludeId để ẩn job đang xem */
   suggested(title = "Gợi ý hôm nay", excludeId = null, ids = [2, 3, 5]) {
     const list = ids
       .map(getJobById)
@@ -329,6 +352,7 @@ const Rail = {
       </div>`;
   },
 
+  /** Khối AI Match trên trang chi tiết: vòng %, ưu/nhược, comment */
   aiMatch(job) {
     return `
       <div class="card section ai-match-card" style="margin-top:0">
@@ -403,6 +427,7 @@ const Rail = {
   },
 };
 
+/** Gắn HTML vào #rail rồi animate các score-ring bên trong */
 function fillRail(html) {
   const rail = qs("#rail");
   if (!rail) return;
@@ -412,6 +437,9 @@ function fillRail(html) {
 
 /* =========================================================
    5. JOB UI — swipe card, job row, AI modal
+   cardInner = nội dung 1 card swipe.
+   jobRow   = 1 dòng trong danh sách Explore / Company.
+   Modal + save-heart dùng event delegation (bindGlobalClicks).
    ========================================================= */
 function cardInner(job) {
   const company = getCompany(job.companyId);
@@ -494,6 +522,12 @@ function openMatchModal(jobId) {
   animateRings(qs("#match-overlay-body"));
 }
 
+/**
+ * Listener toàn cục (một lần lúc boot):
+ * - [data-open-match] → modal AI
+ * - [data-close-modal] / click overlay / Escape → đóng
+ * - [data-save] → toggle Store + event jobly:saved-changed (Explore lắng nghe)
+ */
 function bindGlobalClicks() {
   document.addEventListener("click", (e) => {
     const open = e.target.closest("[data-open-match]");
@@ -523,6 +557,7 @@ function goDetail(id) {
   location.href = `/jobs?id=${id}`;
 }
 
+/** Ghi applied rồi sang trang chúc mừng /match */
 function goMatch(id) {
   Store.addApplied(id);
   location.href = `/match?id=${id}`;
@@ -530,9 +565,13 @@ function goMatch(id) {
 
 /* =========================================================
    6. PAGES
+   Mỗi Blade set body[data-page]; boot gọi đúng init*.
    ========================================================= */
 
-/* ---------- HOME ---------- */
+/* ---------- HOME ----------
+   Deck 3 card chồng nhau. Ẩn job đã apply/skip.
+   SwipeEngine: apply → /match, skip → refill card, click → /jobs?id=
+   ---------- */
 function deckJobs() {
   const hidden = new Set([...Store.applied(), ...Store.skipped()]);
   return JOBS.filter((j) => !hidden.has(j.id)).sort((a, b) => b.match - a.match);
@@ -543,6 +582,7 @@ function renderStack() {
   if (!stack) return;
   const jobs = deckJobs();
   if (!jobs.length) {
+    // Hết bài: empty state + nút xóa skipped để xem lại (giữ applied)
     stack.outerHTML = `
       <div class="card empty-deck">
         <div class="emoji">✨</div>
@@ -565,6 +605,7 @@ function renderStack() {
     .join("");
 }
 
+/** Sau khi skip: nếu stack còn < 3 card thì nhét job tiếp theo vào đáy */
 function refillStack() {
   const stack = qs("#card-stack");
   if (!stack) return;
@@ -615,6 +656,7 @@ function initHome() {
     const card = SwipeEngine.frontCard();
     if (card) goDetail(card.dataset.jobId);
   });
+  // Phím ↑ apply, ↓ skip — bỏ qua khi đang gõ input
   window.addEventListener("keydown", (e) => {
     if (e.target.matches("input, textarea")) return;
     if (e.key === "ArrowUp") {
@@ -628,7 +670,10 @@ function initHome() {
   });
 }
 
-/* ---------- EXPLORE ---------- */
+/* ---------- EXPLORE ----------
+   Danh sách job + chip lọc (all / saved / Remote / type).
+   ?saved=1 mở thẳng tab Đã lưu. Search lọc theo title/company/location/skills.
+   ---------- */
 function initExplore() {
   const list = qs("#job-list");
   if (!list) return;
@@ -686,7 +731,10 @@ function initExplore() {
   render();
 }
 
-/* ---------- JOB DETAIL ---------- */
+/* ---------- JOB DETAIL ----------
+   /jobs?id= — mô tả, yêu cầu, quyền lợi, CTA apply.
+   Đã apply thì nút chuyển sang /applications.
+   ---------- */
 function initDetail() {
   const root = qs("#detail-root");
   if (!root) return;
@@ -752,7 +800,10 @@ function initDetail() {
   icons();
 }
 
-/* ---------- MATCH ---------- */
+/* ---------- MATCH ----------
+   Màn hình "đã apply thành công" + confetti.
+   Đảm bảo jobId nằm trong Store.applied dù vào thẳng URL.
+   ---------- */
 function burstConfetti() {
   const colors = ["#6366f1", "#2dd4bf", "#f472b6", "#f59e0b", "#8b5cf6", "#3b82f6"];
   for (let i = 0; i < 44; i += 1) {
@@ -820,7 +871,11 @@ function initMatch() {
   icons();
 }
 
-/* ---------- CHAT ---------- */
+/* ---------- CHAT ----------
+   3 cột: danh sách hội thoại | thread | panel info.
+   messagesById giữ tin trong RAM (mất khi reload). Recruiter reply giả sau 1.1s.
+   Màu chủ đề lưu localStorage theo conv id.
+   ---------- */
 function initChat() {
   const layout = qs("#chat-layout");
   if (!layout) return;
@@ -829,6 +884,7 @@ function initChat() {
   let activeId = param("c") || CONVERSATIONS[0].id;
   const messagesById = {};
 
+  /** Thread đầy đủ cho Mây Creative; hội thoại khác = 3 tin giả từ conv.last */
   const buildMessages = (conv) => {
     if (conv.id === CHAT_THREAD.companyId) return [...CHAT_THREAD.messages];
     const job = getJobById(conv.jobId);
@@ -1103,10 +1159,13 @@ function initChat() {
   });
 
   openConv(activeId);
+  // Mobile: không có ?c= thì hiện list hội thoại trước, ẩn thread
   if (window.matchMedia("(max-width: 960px)").matches && !param("c")) layout.classList.add("show-list");
 }
 
-/* ---------- APPLICATIONS ---------- */
+/* ---------- APPLICATIONS ----------
+   Timeline mock từ APPLICATIONS (data.js) + job user vừa apply (Store) chưa có trong mock.
+   ---------- */
 function initApplications() {
   const list = qs("#app-list");
   if (!list) return;
@@ -1159,7 +1218,9 @@ function initApplications() {
   icons();
 }
 
-/* ---------- PROFILE ---------- */
+/* ---------- PROFILE ----------
+   Hồ sơ USER từ data.js. Nút sửa / thêm skill / CV mới chỉ toast (chưa API).
+   ---------- */
 function initProfile() {
   const root = qs("#profile-root");
   if (!root) return;
@@ -1228,7 +1289,9 @@ function initProfile() {
   icons();
 }
 
-/* ---------- COMPANY ---------- */
+/* ---------- COMPANY ----------
+   /companies?id= — hero, tab Giới thiệu / Việc làm / Đánh giá, follow (Store).
+   ---------- */
 function initCompany() {
   const root = qs("#company-root");
   if (!root) return;
@@ -1318,6 +1381,8 @@ function initCompany() {
 
 /* =========================================================
    BOOT
+   layout/app.blade.php set data-page trên <body>.
+   Thứ tự: shell → click toàn cục → init trang hiện tại → vẽ icon Lucide.
    ========================================================= */
 document.addEventListener("DOMContentLoaded", () => {
   renderShell();
