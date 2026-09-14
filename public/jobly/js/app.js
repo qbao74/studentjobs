@@ -74,11 +74,11 @@ const Store = {
    2. HELPERS
    ========================================================= */
 const NAV = [
-  { id: "home", href: "index.html", label: "Home", icon: "house" },
-  { id: "explore", href: "explore.html", label: "Khám phá", icon: "compass" },
-  { id: "saved", href: "explore.html?saved=1", label: "Đã lưu", icon: "heart" },
-  { id: "applications", href: "applications.html", label: "Đã apply", icon: "circle-check-big" },
-  { id: "chat", href: "chat.html", label: "Tin nhắn", icon: "message-circle", badge: 3 },
+  { id: "home", href: "/", label: "Home", icon: "house" },
+  { id: "explore", href: "/explore", label: "Khám phá", icon: "compass" },
+  { id: "saved", href: "/explore?saved=1", label: "Đã lưu", icon: "heart" },
+  { id: "applications", href: "/applications", label: "Đã apply", icon: "circle-check-big" },
+  { id: "chat", href: "/chat", label: "Tin nhắn", icon: "message-circle", badge: 3 },
 ];
 
 const MOBILE_NAV = [
@@ -86,7 +86,7 @@ const MOBILE_NAV = [
   NAV[1],
   NAV[3],
   NAV[4],
-  { id: "profile", href: "profile.html", label: "Hồ sơ", icon: "user-round" },
+  { id: "profile", href: "/profile", label: "Hồ sơ", icon: "user-round" },
 ];
 
 const qs = (sel, root = document) => root.querySelector(sel);
@@ -186,7 +186,7 @@ function renderShell() {
 
   if (sidebar) {
     sidebar.innerHTML = `
-      <a class="logo" href="index.html">
+      <a class="logo" href="/">
         <span class="logo-mark">${icon("sparkles")}</span>
         <span>Jobly<small>Swipe • Match • Build</small></span>
       </a>
@@ -219,11 +219,11 @@ function renderShell() {
         </div>
       </div>
       <div class="sidebar-user-row">
-        <a class="sidebar-user" href="profile.html">
+        <a class="sidebar-user" href="/profile">
           <img class="avatar" src="${USER.avatar}" alt="${USER.name}">
           <div><strong>${USER.name}</strong><span>${USER.year}</span></div>
         </a>
-        <a class="icon-btn icon-btn--ghost" href="profile.html" aria-label="Cài đặt">${icon("settings")}</a>
+        <a class="icon-btn icon-btn--ghost" href="/profile" aria-label="Cài đặt">${icon("settings")}</a>
       </div>`;
     requestAnimationFrame(() =>
       qsa(".progress-bar span[data-w]").forEach((s) => (s.style.width = `${s.dataset.w}%`))
@@ -274,7 +274,7 @@ const Rail = {
       <div class="ai-profile-card">
         <h3>${icon("sparkles")} Tối ưu hồ sơ của bạn</h3>
         <p>Cập nhật thêm kỹ năng để nhận được nhiều công việc phù hợp hơn.</p>
-        <a class="btn" href="profile.html">Cải thiện hồ sơ ${icon("arrow-right")}</a>
+        <a class="btn" href="/profile">Cải thiện hồ sơ ${icon("arrow-right")}</a>
       </div>`;
   },
 
@@ -305,7 +305,7 @@ const Rail = {
             .map((job) => {
               const c = getCompany(job.companyId);
               return `
-              <a class="suggest-item" href="job-detail.html?id=${job.id}">
+              <a class="suggest-item" href="/jobs?id=${job.id}">
                 ${logoHtml(c)}
                 <div>
                   <strong>${escapeHtml(job.title)}</strong>
@@ -395,7 +395,7 @@ const Rail = {
 
   companyMini(company) {
     return `
-      <a class="card card--hover mini-company" href="company.html?id=${company.id}">
+      <a class="card card--hover mini-company" href="/companies?id=${company.id}">
         ${logoHtml(company)}
         <div><strong>${escapeHtml(company.name)}</strong><small>${escapeHtml(company.size)}</small></div>
         ${icon("chevron-right")}
@@ -451,8 +451,8 @@ function jobRow(job, i = 0) {
     <article class="card card--hover job-row" style="animation-delay:${i * 40}ms">
       ${logoHtml(c)}
       <div>
-        <a href="job-detail.html?id=${job.id}"><h3>${escapeHtml(job.title)}</h3></a>
-        <p class="company-name"><a href="company.html?id=${c.id}">${escapeHtml(job.company)}</a> ${verifiedHtml(c)}</p>
+        <a href="/jobs?id=${job.id}"><h3>${escapeHtml(job.title)}</h3></a>
+        <p class="company-name"><a href="/companies?id=${c.id}">${escapeHtml(job.company)}</a> ${verifiedHtml(c)}</p>
         <div class="job-row-meta">
           <span>${icon("wallet")}${escapeHtml(job.salary)}</span>
           <span>${icon("map-pin")}${escapeHtml(job.location.split(",")[0])}</span>
@@ -465,7 +465,7 @@ function jobRow(job, i = 0) {
         ${matchPill(job)}
         <div class="job-row-actions">
           <button class="save-btn ${Store.isSaved(job.id) ? "is-saved" : ""}" data-save="${job.id}" type="button" aria-label="Lưu">${icon("heart")}</button>
-          <a class="arrow-btn" href="job-detail.html?id=${job.id}" aria-label="Xem chi tiết">${icon("arrow-right")}</a>
+          <a class="arrow-btn" href="/jobs?id=${job.id}" aria-label="Xem chi tiết">${icon("arrow-right")}</a>
         </div>
       </div>
     </article>`;
@@ -488,7 +488,7 @@ function openMatchModal(jobId) {
       ${job.whyMatch.cons.map((c) => `<li><span class="warn">!</span>Thiếu: ${escapeHtml(c)}</li>`).join("")}
     </ul>
     <div class="ai-note"><strong>AI nhận xét.</strong> ${escapeHtml(job.whyMatch.comment)}</div>
-    <a class="btn btn-primary btn-lg" style="margin-top:16px" href="job-detail.html?id=${job.id}">Xem chi tiết công việc</a>`;
+    <a class="btn btn-primary btn-lg" style="margin-top:16px" href="/jobs?id=${job.id}">Xem chi tiết công việc</a>`;
   qs("#match-overlay").classList.add("is-open");
   icons();
   animateRings(qs("#match-overlay-body"));
@@ -520,12 +520,12 @@ function bindGlobalClicks() {
 }
 
 function goDetail(id) {
-  location.href = `job-detail.html?id=${id}`;
+  location.href = `/jobs?id=${id}`;
 }
 
 function goMatch(id) {
   Store.addApplied(id);
-  location.href = `match.html?id=${id}`;
+  location.href = `/match?id=${id}`;
 }
 
 /* =========================================================
@@ -549,7 +549,7 @@ function renderStack() {
         <h2>Bạn đã xem hết gợi ý hôm nay</h2>
         <p>Khám phá thêm cơ hội khác, hoặc theo dõi những việc đã ứng tuyển.</p>
         <div class="match-actions">
-          <a class="btn btn-primary" href="explore.html">Khám phá thêm</a>
+          <a class="btn btn-primary" href="/explore">Khám phá thêm</a>
           <button class="btn btn-ghost" type="button" id="reset-deck">Xem lại từ đầu</button>
         </div>
       </div>`;
@@ -710,7 +710,7 @@ function initDetail() {
           </div>
         </div>
         <h1 class="detail-title">${escapeHtml(job.title)} <span>· ${escapeHtml(job.type)}</span></h1>
-        <p class="detail-company"><a href="company.html?id=${company.id}">${escapeHtml(job.company)}</a> ${verifiedHtml(company)} <span>· ${escapeHtml(company.tagline)}</span></p>
+        <p class="detail-company"><a href="/companies?id=${company.id}">${escapeHtml(job.company)}</a> ${verifiedHtml(company)} <span>· ${escapeHtml(company.tagline)}</span></p>
         <div class="detail-meta">
           <div class="meta-item">${icon("wallet")}${escapeHtml(job.salary)}</div>
           <div class="meta-item">${icon("map-pin")}${escapeHtml(job.location)}</div>
@@ -737,7 +737,7 @@ function initDetail() {
   qs("#apply-now")?.addEventListener("click", (e) => {
     const btn = e.currentTarget;
     if (btn.classList.contains("is-done")) {
-      location.href = "applications.html";
+      location.href = "/applications";
       return;
     }
     btn.classList.add("is-done");
@@ -780,14 +780,14 @@ function initMatch() {
       <div class="match-emoji">🎉</div>
       <h1>Tuyệt vời!</h1>
       <p>Bạn đã ứng tuyển thành công.<br><strong>${escapeHtml(job.company)}</strong> đã nhận được CV của bạn.</p>
-      <a class="card card--hover match-mini" href="job-detail.html?id=${job.id}">
+      <a class="card card--hover match-mini" href="/jobs?id=${job.id}">
         <img src="${job.image}" alt="">
         <div><strong>${escapeHtml(job.title)}</strong><small>${escapeHtml(job.company)} · ${escapeHtml(job.location.split(",")[0])}</small></div>
         <span class="match-pill" data-tone="${matchTone(job.match)}">${job.match}% phù hợp</span>
       </a>
       <div class="match-actions">
-        <a class="btn btn-primary" href="applications.html">${icon("route")} Xem tiến trình</a>
-        <a class="btn btn-ghost" href="index.html">${icon("house")} Về trang chủ</a>
+        <a class="btn btn-primary" href="/applications">${icon("route")} Xem tiến trình</a>
+        <a class="btn btn-ghost" href="/">${icon("house")} Về trang chủ</a>
       </div>
     </div>
     <div class="match-steps">
@@ -810,8 +810,8 @@ function initMatch() {
         <strong>Mẹo từ AI.</strong> Bổ sung ${escapeHtml(job.whyMatch.cons[0] || "portfolio")} vào hồ sơ để tăng cơ hội được shortlist.
       </div>
       <div class="match-actions" style="margin-top:14px;justify-content:flex-start">
-        <a class="btn btn-soft btn-sm" href="chat.html?c=${company.id}">${icon("message-circle")} Mở tin nhắn</a>
-        <a class="btn btn-soft btn-sm" href="company.html?id=${company.id}">${icon("building-2")} Xem công ty</a>
+        <a class="btn btn-soft btn-sm" href="/chat?c=${company.id}">${icon("message-circle")} Mở tin nhắn</a>
+        <a class="btn btn-soft btn-sm" href="/companies?id=${company.id}">${icon("building-2")} Xem công ty</a>
       </div>
     </div>
     ${Rail.quickStats()}
@@ -882,7 +882,7 @@ function initChat() {
       `<div class="thread-pin">
         ${logoHtml(c)}
         <div><strong>${escapeHtml(job.title)}</strong><small>Đang trao đổi về vị trí này · ${escapeHtml(job.salary)}</small></div>
-        <a class="btn btn-soft btn-sm" href="job-detail.html?id=${job.id}">Xem job</a>
+        <a class="btn btn-soft btn-sm" href="/jobs?id=${job.id}">Xem job</a>
       </div>
       <span class="day-sep">Hôm nay</span>` + groups.map(groupHtml).join("");
     thread.scrollTop = thread.scrollHeight;
@@ -933,8 +933,8 @@ function initChat() {
         <h3>${escapeHtml(c.name)} ${verifiedHtml(c)}</h3>
         <p>${conv.online ? "Đang hoạt động" : `Hoạt động ${conv.time.toLowerCase()}`} · ${escapeHtml(c.location)}</p>
         <div class="chat-info-actions">
-          <a href="company.html?id=${c.id}"><span class="icon-btn">${icon("building-2")}</span>Công ty</a>
-          <a href="job-detail.html?id=${job.id}"><span class="icon-btn">${icon("briefcase")}</span>Xem job</a>
+          <a href="/companies?id=${c.id}"><span class="icon-btn">${icon("building-2")}</span>Công ty</a>
+          <a href="/jobs?id=${job.id}"><span class="icon-btn">${icon("briefcase")}</span>Xem job</a>
           <button type="button" id="mute-btn"><span class="icon-btn">${icon("bell")}</span>Thông báo</button>
         </div>
       </div>
@@ -945,7 +945,7 @@ function initChat() {
 
       <div class="info-block">
         <h4>Ứng tuyển ${icon("chevron-right")}</h4>
-        <a class="job-brief" href="applications.html">
+        <a class="job-brief" href="/applications">
           <div><strong>${escapeHtml(job.title)}</strong><small>${escapeHtml(job.salary)} · ${escapeHtml(job.type)}</small></div>
           <span class="status-tag">${escapeHtml(status)}</span>
         </a>
@@ -964,7 +964,7 @@ function initChat() {
       <div class="info-block">
         <h4>Ảnh đã chia sẻ <span class="muted" style="font-weight:600">${photos.length}</span></h4>
         <div class="media-grid">
-          ${photos.map((j) => `<a href="job-detail.html?id=${j.id}"><img src="${j.image}" alt="" loading="lazy"></a>`).join("")}
+          ${photos.map((j) => `<a href="/jobs?id=${j.id}"><img src="${j.image}" alt="" loading="lazy"></a>`).join("")}
         </div>
       </div>
 
@@ -1009,7 +1009,7 @@ function initChat() {
     qs("#chat-status").innerHTML = conv.online
       ? `<span class="online-dot"></span>Đang hoạt động · ${escapeHtml(job.title)}`
       : `Hoạt động ${conv.time.toLowerCase()} · ${escapeHtml(job.title)}`;
-    qs("#chat-company-link").href = `company.html?id=${c.id}`;
+    qs("#chat-company-link").href = `/companies?id=${c.id}`;
     qs("#quick-replies").style.display = id === CHAT_THREAD.companyId ? "" : "none";
     layout.classList.remove("show-list");
     renderConvs();
@@ -1137,7 +1137,7 @@ function initApplications() {
           <div class="app-card-head">
             ${logoHtml(c)}
             <div>
-              <h2><a href="job-detail.html?id=${job.id}">${escapeHtml(job.title)}</a></h2>
+              <h2><a href="/jobs?id=${job.id}">${escapeHtml(job.title)}</a></h2>
               <small>${escapeHtml(job.company)} · ${escapeHtml(job.salary)}</small>
             </div>
             <span class="status-tag">${escapeHtml(current)}</span>
@@ -1252,7 +1252,7 @@ function initCompany() {
           <button class="btn btn-primary follow-btn ${following ? "is-following" : ""}" id="follow-btn" type="button">
             ${following ? `${icon("check")} Đang theo dõi` : `${icon("plus")} Theo dõi`}
           </button>
-          <a class="icon-btn" href="chat.html?c=${company.id}" aria-label="Nhắn tin">${icon("message-circle")}</a>
+          <a class="icon-btn" href="/chat?c=${company.id}" aria-label="Nhắn tin">${icon("message-circle")}</a>
         </div>
       </div>
     </article>
