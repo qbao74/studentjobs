@@ -11,7 +11,20 @@ return new class extends Migration
      */
     public function up(): void
     {
-        //
+        Schema::create('job_posts', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('company_id')->constrained()->cascadeOnDelete();
+            $table->string('title');
+            $table->string('salary')->nullable();
+            $table->string('location')->nullable();
+            $table->string('type')->nullable();
+            $table->string('hours')->nullable();
+            $table->string('image')->nullable();
+            $table->text('description')->nullable();
+            $table->json('requirements')->nullable();
+            $table->json('benefits')->nullable();
+            $table->timestamps();
+        });
     }
 
     /**
@@ -19,6 +32,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        //
+        Schema::dropIfExists('job_posts');
     }
 };

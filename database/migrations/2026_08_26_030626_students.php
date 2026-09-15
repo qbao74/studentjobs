@@ -11,7 +11,19 @@ return new class extends Migration
      */
     public function up(): void
     {
-        //
+        Schema::create('students', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('user_id')->constrained()->cascadeOnDelete();
+            $table->string('school')->nullable();
+            $table->string('major')->nullable();
+            $table->string('year')->nullable();
+            $table->string('location')->nullable();
+            $table->string('phone')->nullable();
+            $table->text('bio')->nullable();
+            $table->string('avatar')->nullable();
+            $table->unsignedTinyInteger('profile_score')->default(0);
+            $table->timestamps();
+        });
     }
 
     /**
@@ -19,6 +31,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        //
+        Schema::dropIfExists('students');
     }
 };
