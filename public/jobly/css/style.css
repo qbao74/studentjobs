@@ -251,7 +251,8 @@ svg {
   animation: pageIn 0.45s var(--ease) both;
 }
 
-.app:not(.has-rail) .main {
+/* Chat không kẹp 1180px — cần tràn hết chỗ rail */
+body:not([data-page="chat"]) .app:not(.has-rail) .main {
   max-width: 1180px;
 }
 
@@ -2019,11 +2020,27 @@ body[data-page="match"] .main {
    .chat-thread = vùng tin nhắn cuộn   .chat-input = ô gửi
    Mobile: mục 19 ẩn cột, class .show-list do JS gắn.
    ------------------------------------------------------------ */
-/* Chat không có rail: bỏ trần 1180px để khung 3 cột tràn hết chỗ cột phải */
-body[data-page="chat"] .app:not(.has-rail) .main {
-  max-width: none;
+/* Chat: ẩn cột rail (kể cả khi Blade vẫn gắn has-rail) và cho main chiếm hết */
+body[data-page="chat"] .app,
+body[data-page="chat"] .app.has-rail {
+  grid-template-columns: var(--sidebar-w) minmax(0, 1fr);
+}
+
+body[data-page="chat"] .rail {
+  display: none;
+}
+
+body[data-page="chat"] .main {
+  max-width: none !important;
+  width: auto;
+  min-width: 0;
+  grid-column: 2 / -1;
+  padding: 16px 20px 20px;
+}
+
+body[data-page="chat"] .chat-layout {
   width: 100%;
-  padding: 20px 24px 24px;
+  max-width: none;
 }
 
 /* 3 cột: mọi cột đều minmax(0, …) + min-width:0 để không bao giờ tràn ngang */

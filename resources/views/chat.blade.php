@@ -1,8 +1,7 @@
 @extends('layout.app')
 @section('title', 'Chat - Jobly')
 @section('page', 'chat')
-@section('hide-rail')
-@endsection
+@section('hide-rail', '1')
 @section('content')
     <div class="chat-layout" id="chat-layout">
         <aside class="card conv-list">
