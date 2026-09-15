@@ -1,16 +1,9 @@
 /**
- * Jobly — Mock data (dữ liệu giả)
+ * Jobly — du lieu mau (mock)
  *
- * File này KHÔNG vẽ giao diện. Chỉ khai báo biến để app.js đọc.
- * Giống bảng SQL đã SELECT sẵn, nhét cứng vào JS.
- *
- * SỬA GÌ Ở ĐÂY:
- * - Đổi tên sinh viên, trường, skill  → object USER bên dưới
- * - Thêm/sửa việc làm                 → mảng JOBS (mỗi {} là 1 job)
- * - Thêm công ty                      → object COMPANIES
- * - Chat / đơn apply / review         → CONVERSATIONS, APPLICATIONS, REVIEWS
- *
- * Sau này Laravel: bỏ các const này, fetch('/api/jobs') rồi gán cùng cấu trúc.
+ * Ham khong dau (layCongTy, layViecTheoId) = minh viet — xem comment tren ham.
+ * JOBS / USER / companyId = du lieu, giu tieng Anh de sau nay khop API.
+ * find, filter, Number, Object.keys = san cua JavaScript.
  */
 
 /** Hồ sơ user đang đăng nhập — trang Home (“Chào Bảo”) và Profile đọc cái này */
@@ -604,24 +597,24 @@ const REVIEWS = [
 ];
 
 /** Tìm 1 job theo id. Number(id) vì URL luôn là chuỗi ("1"), còn job.id là số */
-function getJobById(id) {
+function layViecTheoId(id) {
   return JOBS.find((job) => job.id === Number(id));
 }
 
 /** Cover mặc định cho công ty chưa có ảnh riêng */
-const DEFAULT_COVERS = [
+const ANH_BIA_MAC_DINH = [
   "https://images.unsplash.com/photo-1497215728101-856f4ea42174?auto=format&fit=crop&w=1600&q=80",
   "https://images.unsplash.com/photo-1524758631624-e2822e304c36?auto=format&fit=crop&w=1600&q=80",
   "https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=1600&q=80",
 ];
 
 /** Lấy công ty theo id. Nếu thiếu cover/jobsCount thì tự gán mặc định rồi trả về */
-function getCompany(companyId) {
+function layCongTy(companyId) {
   const c = COMPANIES[companyId];
   if (!c) return undefined;
   if (!c.cover) {
     const idx = Object.keys(COMPANIES).indexOf(companyId);
-    c.cover = DEFAULT_COVERS[idx % DEFAULT_COVERS.length];
+    c.cover = ANH_BIA_MAC_DINH[idx % ANH_BIA_MAC_DINH.length];
   }
   if (!c.jobsCount) c.jobsCount = 4 + (companyId.length % 9);
   if (!c.followers) c.followers = `${(companyId.length * 0.3).toFixed(1)}k`;
@@ -629,12 +622,12 @@ function getCompany(companyId) {
 }
 
 /** Tất cả job thuộc 1 công ty — trang /companies */
-function jobsByCompany(companyId) {
+function viecCuaCongTy(companyId) {
   return JOBS.filter((job) => job.companyId === companyId);
 }
 
 /** Đổi % match thành high/mid/low — CSS dùng data-tone để tô màu viên thuốc */
-function matchTone(percent) {
+function mucDoKhop(percent) {
   if (percent >= 88) return "high";
   if (percent >= 75) return "mid";
   return "low";

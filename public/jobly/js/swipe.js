@@ -1,101 +1,82 @@
 /**
- * Jobly — Swipe engine
+ * Jobly — bo vuot the viec (trang Home)
  *
- * Engine vuốt card việc làm trên trang Home.
- * - Vuốt LÊN  = Apply (ứng tuyển)
- * - Vuốt XUỐNG = Skip (bỏ qua)
+ * Ten tieng Viet khong dau = ham minh viet. Xem comment ngay tren ham.
+ * Ten tieng Anh (addEventListener, querySelector, setTimeout) = san cua trinh duyet.
  *
- * Dùng Pointer Events nên chạy được cả chuột (desktop) và ngón tay (mobile).
- * IIFE trả về object công khai: init / applyCurrent / skipCurrent / promoteStack / frontCard.
- * app.js gọi các hàm này; engine không biết JOBS hay Store.
+ * Vuot LEN = ung tuyen. Vuot XUONG = bo qua.
  */
-const SwipeEngine = (() => {
-  // Số pixel vuốt dọc tối thiểu mới tính là swipe (nhỏ hơn thì snap về hoặc coi là click)
-  const THRESHOLD = 110;
-  // Góc nghiêng tối đa khi kéo card (độ)
-  const MAX_ROTATE = 8;
+const BoVuot = (() => {
+  /** So pixel keo doc toi thieu moi tinh la vuot (nho hon thi tha ve cho). */
+  const NGUONG = 110;
+  /** Goc nghieng toi da khi keo the (do). */
+  const DO_NGHIENG_TOI_DA = 8;
 
-  // DOM của chồng card (#card-stack) — gắn listener một lần ở init()
-  let stackEl = null;
-  // Callback từ app.js: onApply(jobId), onSkip(jobId), onClick(jobId)
-  let onApply = null;
-  let onSkip = null;
-  let onClick = null;
+  let chongThe = null;
+  let khiUngTuyen = null;
+  let khiBo = null;
+  let khiBam = null;
 
-  // Trạng thái một lần kéo: tọa độ bắt đầu, độ lệch Y hiện tại, card đang cầm
   let startY = 0;
   let startX = 0;
   let currentY = 0;
-  let dragging = false;
+  let dangKeo = false;
   let startTime = 0;
-  let card = null;
+  let the = null;
 
-  /**
-   * Khởi tạo engine trên một stack DOM.
-   * options.stack   — phần tử chứa các .job-card
-   * options.onApply — gọi khi card bay lên (apply)
-   * options.onSkip  — gọi khi card bay xuống (skip)
-   * options.onClick — gọi khi tap nhẹ (không đủ là swipe) → mở chi tiết
-   */
-  function init(options) {
-    stackEl = options.stack;
-    onApply = options.onApply;
-    onSkip = options.onSkip;
-    onClick = options.onClick || null;
-    // Ủy quyền sự kiện trên stack — tránh gắn trùng listener mỗi lần đổi card
-    stackEl.addEventListener("pointerdown", onDown);
+  /** Gan engine vao #card-stack; nhan callback khiUngTuyen / khiBo / khiBam. */
+  function khoiTao(tuyChon) {
+    chongThe = tuyChon.chongThe;
+    khiUngTuyen = tuyChon.khiUngTuyen;
+    khiBo = tuyChon.khiBo;
+    khiBam = tuyChon.khiBam || null;
+    chongThe.addEventListener("pointerdown", khiNhan);
   }
 
-  /** Card đang ở mặt trước (class is-front) — card người dùng tương tác */
-  function frontCard() {
-    return stackEl?.querySelector(".job-card.is-front");
+  /** Tra ve the dang o mat truoc (class is-front). */
+  function theMatTruoc() {
+    return chongThe?.querySelector(".job-card.is-front");
   }
 
-  /** Hai nhãn APPLY / SKIP nằm trên card; opacity tăng dần khi kéo đúng hướng */
-  function labels(el) {
+  /** Lay 2 nhan APPLY / SKIP ben trong mot the. */
+  function nhanVuot(el) {
     return {
       apply: el.querySelector(".swipe-label--apply"),
       skip: el.querySelector(".swipe-label--skip"),
     };
   }
 
-  /** Bắt đầu kéo: chỉ nhận nút trái, bỏ qua nếu bấm vào button/link/ô "Vì sao phù hợp" */
-  function onDown(e) {
+  /** Bat dau keo: chi nut trai, bo qua neu bam vao button/link/o "Vi sao phu hop". */
+  function khiNhan(e) {
     if (e.button !== undefined && e.button !== 0) return;
-    card = e.target.closest(".job-card.is-front");
-    // Không bắt đầu kéo khi bấm vào nút/link/ô "Vì sao phù hợp" bên trong card
-    if (!card || e.target.closest("button, a, [data-open-match]")) return;
+    the = e.target.closest(".job-card.is-front");
+    if (!the || e.target.closest("button, a, [data-open-match]")) return;
     e.preventDefault();
 
-    dragging = true;
+    dangKeo = true;
     startY = e.clientY;
     startX = e.clientX;
     currentY = 0;
     startTime = Date.now();
-    card.classList.add("is-dragging");
-    // Giữ pointer trên card dù ngón tay/chuột ra ngoài vùng card
-    card.setPointerCapture?.(e.pointerId);
+    the.classList.add("is-dragging");
+    the.setPointerCapture?.(e.pointerId);
 
-    window.addEventListener("pointermove", onMove);
-    window.addEventListener("pointerup", onUp);
-    window.addEventListener("pointercancel", onUp);
+    window.addEventListener("pointermove", khiKeo);
+    window.addEventListener("pointerup", khiTha);
+    window.addEventListener("pointercancel", khiTha);
   }
 
-  /**
-   * Khi đang kéo: dịch card theo ngón tay, nghiêng nhẹ, hiện nhãn APPLY (lên) hoặc SKIP (xuống).
-   * dx chỉ dùng để nghiêng / trượt ngang rất nhẹ — quyết định apply/skip dựa vào currentY.
-   */
-  function onMove(e) {
-    if (!dragging || !card) return;
+  /** Dang keo: dich the theo ngon tay, nghieng nhe, hien nhan APPLY (len) hoac SKIP (xuong). */
+  function khiKeo(e) {
+    if (!dangKeo || !the) return;
     currentY = e.clientY - startY;
     const dx = e.clientX - startX;
-    const rotate = Math.max(-MAX_ROTATE, Math.min(MAX_ROTATE, dx * 0.04 + currentY * -0.02));
-    card.style.transform = `translate(${dx * 0.15}px, ${currentY}px) rotate(${rotate}deg)`;
+    const rotate = Math.max(-DO_NGHIENG_TOI_DA, Math.min(DO_NGHIENG_TOI_DA, dx * 0.04 + currentY * -0.02));
+    the.style.transform = `translate(${dx * 0.15}px, ${currentY}px) rotate(${rotate}deg)`;
 
-    const { apply, skip } = labels(card);
+    const { apply, skip } = nhanVuot(the);
     const abs = Math.abs(currentY);
-    // t = 0..1: càng gần ngưỡng thì nhãn càng đậm / to
-    const t = Math.min(1, abs / THRESHOLD);
+    const t = Math.min(1, abs / NGUONG);
     if (currentY < 0) {
       apply.style.opacity = String(t);
       apply.style.transform = `translateX(-50%) scale(${0.92 + t * 0.08}) rotate(-8deg)`;
@@ -107,92 +88,88 @@ const SwipeEngine = (() => {
     }
   }
 
-  /**
-   * Thả tay: phân biệt click / swipe-up / swipe-down / kéo chưa đủ thì trả card về chỗ.
-   * dist + elapsed: tap ngắn → xem chi tiết, không tính swipe.
-   */
-  function onUp(e) {
-    window.removeEventListener("pointermove", onMove);
-    window.removeEventListener("pointerup", onUp);
-    window.removeEventListener("pointercancel", onUp);
+  /** Tha tay: click nhe = xem chi tiet; vuot du nguong = phong the; keo ngan = tra ve cho. */
+  function khiTha(e) {
+    window.removeEventListener("pointermove", khiKeo);
+    window.removeEventListener("pointerup", khiTha);
+    window.removeEventListener("pointercancel", khiTha);
 
-    if (!card) return;
+    if (!the) return;
     const dy = currentY;
     const dist = Math.hypot(e.clientX - startX, e.clientY - startY);
     const elapsed = Date.now() - startTime;
-    dragging = false;
-    card.classList.remove("is-dragging");
+    dangKeo = false;
+    the.classList.remove("is-dragging");
 
-    // Click nhẹ trên card → xem chi tiết (không tính là swipe)
-    if (dist < 10 && elapsed < 400 && onClick) {
-      resetCard(card);
-      onClick(Number(card.dataset.jobId));
+    if (dist < 10 && elapsed < 400 && khiBam) {
+      datLaiThe(the);
+      khiBam(Number(the.dataset.jobId));
       return;
     }
 
-    if (dy < -THRESHOLD) {
-      fly(card, "up");
-    } else if (dy > THRESHOLD) {
-      fly(card, "down");
+    if (dy < -NGUONG) {
+      phongThe(the, "up");
+    } else if (dy > NGUONG) {
+      phongThe(the, "down");
     } else {
-      resetCard(card);
+      datLaiThe(the);
     }
   }
 
-  /** Trả card về vị trí ban đầu, ẩn nhãn APPLY/SKIP */
-  function resetCard(el) {
+  /** Tra the ve vi tri ban dau, an nhan APPLY/SKIP. */
+  function datLaiThe(el) {
     el.style.transform = "";
-    const { apply, skip } = labels(el);
+    const { apply, skip } = nhanVuot(el);
     apply.style.opacity = "0";
     skip.style.opacity = "0";
   }
 
-  /**
-   * Animation card bay khỏi stack rồi xóa khỏi DOM.
-   * Sau 380ms: promote card phía sau lên front, gọi onApply hoặc onSkip.
-   */
-  function fly(el, dir) {
+  /** Animation the bay khoi chong roi xoa khoi DOM; xong thi dua the sau len truoc. */
+  function phongThe(el, huong) {
     const jobId = Number(el.dataset.jobId);
     el.classList.add("is-leaving");
     const travel = el.offsetHeight * 1.35;
     el.style.transform =
-      dir === "up"
+      huong === "up"
         ? `translateY(-${travel}px) rotate(-6deg)`
         : `translateY(${travel}px) rotate(6deg)`;
     el.style.opacity = "0";
 
     window.setTimeout(() => {
       el.remove();
-      promoteStack();
-      if (dir === "up") onApply?.(jobId);
-      else onSkip?.(jobId);
+      duaTheSauLenTruoc();
+      if (huong === "up") khiUngTuyen?.(jobId);
+      else khiBo?.(jobId);
     }, 380);
   }
 
-  /**
-   * Gán lại class chồng bài: card[0]=front, [1]=back-1, [2]=back-2.
-   * CSS dùng các class này để scale/dịch card phía sau, tạo hiệu ứng deck.
-   */
-  function promoteStack() {
-    if (!stackEl) return;
-    const cards = [...stackEl.querySelectorAll(".job-card")];
-    cards.forEach((c) => c.classList.remove("is-front", "is-back-1", "is-back-2"));
-    if (cards[0]) cards[0].classList.add("is-front");
-    if (cards[1]) cards[1].classList.add("is-back-1");
-    if (cards[2]) cards[2].classList.add("is-back-2");
+  /** Gan lai class chong bai: the[0]=front, [1]=back-1, [2]=back-2. */
+  function duaTheSauLenTruoc() {
+    if (!chongThe) return;
+    const dsThe = [...chongThe.querySelectorAll(".job-card")];
+    dsThe.forEach((c) => c.classList.remove("is-front", "is-back-1", "is-back-2"));
+    if (dsThe[0]) dsThe[0].classList.add("is-front");
+    if (dsThe[1]) dsThe[1].classList.add("is-back-1");
+    if (dsThe[2]) dsThe[2].classList.add("is-back-2");
   }
 
-  /** Nút Apply trên UI / phím ↑ — animate card hiện tại bay lên */
-  function applyCurrent() {
-    const el = frontCard();
-    if (el) fly(el, "up");
+  /** Nut Apply tren UI / phim mui ten len — bay the hien tai len (ung tuyen). */
+  function ungTuyenTheHienTai() {
+    const el = theMatTruoc();
+    if (el) phongThe(el, "up");
   }
 
-  /** Nút Skip trên UI / phím ↓ — animate card hiện tại bay xuống */
-  function skipCurrent() {
-    const el = frontCard();
-    if (el) fly(el, "down");
+  /** Nut Skip tren UI / phim mui ten xuong — bay the hien tai xuong (bo qua). */
+  function boTheHienTai() {
+    const el = theMatTruoc();
+    if (el) phongThe(el, "down");
   }
 
-  return { init, applyCurrent, skipCurrent, promoteStack, frontCard };
+  return {
+    khoiTao,
+    ungTuyenTheHienTai,
+    boTheHienTai,
+    duaTheSauLenTruoc,
+    theMatTruoc,
+  };
 })();

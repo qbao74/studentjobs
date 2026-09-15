@@ -9,7 +9,7 @@ class DatabaseSeeder extends Seeder
 {
     use WithoutModelEvents;
     /**
-     * Seed the application's database.
+     * Laravel bắt buộc tên run() — điểm vào khi gõ php artisan db:seed.
      */
     public function run(): void
     {

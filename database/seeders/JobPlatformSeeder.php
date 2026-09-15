@@ -15,16 +15,20 @@ class JobPlatformSeeder extends Seeder
 {
     use WithoutModelEvents;
 
+    /**
+     * Laravel bắt buộc tên run() — không đổi.
+     * Ba hàm tiếng Việt bên dưới là mình viết.
+     */
     public function run(): void
     {
         $now = now();
-        $companies = $this->seedCompanies($now);
-        $studentId = $this->seedStudent($now);
-        $this->seedJobs($companies, $studentId, $now);
+        $companies = $this->nhetCongTy($now);
+        $studentId = $this->nhetSinhVien($now);
+        $this->nhetViecLam($companies, $studentId, $now);
     }
 
-    /** COMPANIES { "may-creative": { id, name, ... } } → bảng companies (slug = id JS). */
-    private function seedCompanies(mixed $now): array
+    /** Nhet cac cong ty tu COMPANIES (data.js) vao bang companies. */
+    private function nhetCongTy(mixed $now): array
     {
         $rows = [
             [
@@ -145,7 +149,7 @@ class JobPlatformSeeder extends Seeder
     }
 
     /** USER 1 object JS → users (đăng nhập) + students (hồ sơ). */
-    private function seedStudent(mixed $now): int
+    private function nhetSinhVien(mixed $now): int
     {
         $userId = DB::table('users')->insertGetId([
             'name' => 'Lê Bảo',
@@ -172,7 +176,7 @@ class JobPlatformSeeder extends Seeder
     }
 
     /** JOBS[] → job_posts; skills[] → skills + job_skill / student_skill. */
-    private function seedJobs(array $companies, int $studentId, mixed $now): void
+    private function nhetViecLam(array $companies, int $studentId, mixed $now): void
     {
         $jobs = [
             [
@@ -370,7 +374,8 @@ class JobPlatformSeeder extends Seeder
         ];
 
         $skillIds = [];
-        $ensureSkill = function (string $name) use (&$skillIds, $now): int {
+        // Tao skill neu chua co, tra ve id — tranh insert trung ten.
+        $damBaoKyNang = function (string $name) use (&$skillIds, $now): int {
             if (! isset($skillIds[$name])) {
                 $skillIds[$name] = DB::table('skills')->insertGetId([
                     'ten_skill' => $name,
@@ -383,7 +388,7 @@ class JobPlatformSeeder extends Seeder
         };
 
         foreach (['PHP', 'JavaScript', 'SQL', 'HTML/CSS', 'Figma'] as $name) {
-            $ensureSkill($name);
+            $damBaoKyNang($name);
         }
 
         foreach ($jobs as $job) {
@@ -403,7 +408,7 @@ class JobPlatformSeeder extends Seeder
             foreach ($skillNames as $name) {
                 DB::table('job_skill')->insert([
                     'job_post_id' => $job['id'],
-                    'skill_id' => $ensureSkill($name),
+                    'skill_id' => $damBaoKyNang($name),
                     'created_at' => $now,
                     'updated_at' => $now,
                 ]);
