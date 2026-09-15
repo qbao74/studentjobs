@@ -11,7 +11,15 @@ return new class extends Migration
      */
     public function up(): void
     {
-        //
+        Schema::create('applications', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('student_id')->constrained()->onDelete('cascade');
+            $table->foreignId('job_id')->constrained()->onDelete('cascade');
+            $table->foreignId('cv_id')->constrained()->onDelete('cascade'); // Dùng CV nào
+            $table->text('cover_letter')->nullable(); // Thư giới thiệu
+            $table->enum('status', ['pending', 'reviewing', 'accepted', 'rejected'])->default('pending');
+            $table->timestamps();
+        });
     }
 
     /**
