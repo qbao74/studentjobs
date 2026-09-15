@@ -1,15 +1,15 @@
 /**
- * Jobly — bo vuot the viec (trang Home)
+ * Jobly — bộ vuốt thẻ việc (trang Home)
  *
- * Ten tieng Viet khong dau = ham minh viet. Xem comment ngay tren ham.
- * Ten tieng Anh (addEventListener, querySelector, setTimeout) = san cua trinh duyet.
+ * Tên hàm không dấu = mình viết. Xem comment ngay trên hàm để biết công dụng.
+ * Tên tiếng Anh (addEventListener, querySelector, setTimeout) = sẵn của trình duyệt.
  *
- * Vuot LEN = ung tuyen. Vuot XUONG = bo qua.
+ * Vuốt LÊN = ứng tuyển. Vuốt XUỐNG = bỏ qua.
  */
 const BoVuot = (() => {
-  /** So pixel keo doc toi thieu moi tinh la vuot (nho hon thi tha ve cho). */
+  /** Số pixel kéo dọc tối thiểu mới tính là vuốt (nhỏ hơn thì thả về chỗ). */
   const NGUONG = 110;
-  /** Goc nghieng toi da khi keo the (do). */
+  /** Góc nghiêng tối đa khi kéo thẻ (độ). */
   const DO_NGHIENG_TOI_DA = 8;
 
   let chongThe = null;
@@ -24,7 +24,7 @@ const BoVuot = (() => {
   let startTime = 0;
   let the = null;
 
-  /** Gan engine vao #card-stack; nhan callback khiUngTuyen / khiBo / khiBam. */
+  /** Gắn engine vào #card-stack; nhận callback khiUngTuyen / khiBo / khiBam. */
   function khoiTao(tuyChon) {
     chongThe = tuyChon.chongThe;
     khiUngTuyen = tuyChon.khiUngTuyen;
@@ -33,12 +33,12 @@ const BoVuot = (() => {
     chongThe.addEventListener("pointerdown", khiNhan);
   }
 
-  /** Tra ve the dang o mat truoc (class is-front). */
+  /** Trả về thẻ đang ở mặt trước (class is-front). */
   function theMatTruoc() {
     return chongThe?.querySelector(".job-card.is-front");
   }
 
-  /** Lay 2 nhan APPLY / SKIP ben trong mot the. */
+  /** Lấy 2 nhãn APPLY / SKIP bên trong một thẻ. */
   function nhanVuot(el) {
     return {
       apply: el.querySelector(".swipe-label--apply"),
@@ -46,7 +46,7 @@ const BoVuot = (() => {
     };
   }
 
-  /** Bat dau keo: chi nut trai, bo qua neu bam vao button/link/o "Vi sao phu hop". */
+  /** Bắt đầu kéo: chỉ nút trái, bỏ qua nếu bấm vào button/link/ô "Vì sao phù hợp". */
   function khiNhan(e) {
     if (e.button !== undefined && e.button !== 0) return;
     the = e.target.closest(".job-card.is-front");
@@ -66,7 +66,7 @@ const BoVuot = (() => {
     window.addEventListener("pointercancel", khiTha);
   }
 
-  /** Dang keo: dich the theo ngon tay, nghieng nhe, hien nhan APPLY (len) hoac SKIP (xuong). */
+  /** Đang kéo: dịch thẻ theo ngón tay, nghiêng nhẹ, hiện nhãn APPLY (lên) hoặc SKIP (xuống). */
   function khiKeo(e) {
     if (!dangKeo || !the) return;
     currentY = e.clientY - startY;
@@ -88,7 +88,7 @@ const BoVuot = (() => {
     }
   }
 
-  /** Tha tay: click nhe = xem chi tiet; vuot du nguong = phong the; keo ngan = tra ve cho. */
+  /** Thả tay: click nhẹ = xem chi tiết; vuốt đủ ngưỡng = phóng thẻ; kéo ngắn = trả về chỗ. */
   function khiTha(e) {
     window.removeEventListener("pointermove", khiKeo);
     window.removeEventListener("pointerup", khiTha);
@@ -116,7 +116,7 @@ const BoVuot = (() => {
     }
   }
 
-  /** Tra the ve vi tri ban dau, an nhan APPLY/SKIP. */
+  /** Trả thẻ về vị trí ban đầu, ẩn nhãn APPLY/SKIP. */
   function datLaiThe(el) {
     el.style.transform = "";
     const { apply, skip } = nhanVuot(el);
@@ -124,7 +124,7 @@ const BoVuot = (() => {
     skip.style.opacity = "0";
   }
 
-  /** Animation the bay khoi chong roi xoa khoi DOM; xong thi dua the sau len truoc. */
+  /** Animation thẻ bay khỏi chồng rồi xóa khỏi DOM; xong thì đưa thẻ sau lên trước. */
   function phongThe(el, huong) {
     const jobId = Number(el.dataset.jobId);
     el.classList.add("is-leaving");
@@ -143,7 +143,7 @@ const BoVuot = (() => {
     }, 380);
   }
 
-  /** Gan lai class chong bai: the[0]=front, [1]=back-1, [2]=back-2. */
+  /** Gán lại class chồng bài: thẻ[0]=front, [1]=back-1, [2]=back-2. */
   function duaTheSauLenTruoc() {
     if (!chongThe) return;
     const dsThe = [...chongThe.querySelectorAll(".job-card")];
@@ -153,13 +153,13 @@ const BoVuot = (() => {
     if (dsThe[2]) dsThe[2].classList.add("is-back-2");
   }
 
-  /** Nut Apply tren UI / phim mui ten len — bay the hien tai len (ung tuyen). */
+  /** Nút Apply trên UI / phím mũi tên lên — bay thẻ hiện tại lên (ứng tuyển). */
   function ungTuyenTheHienTai() {
     const el = theMatTruoc();
     if (el) phongThe(el, "up");
   }
 
-  /** Nut Skip tren UI / phim mui ten xuong — bay the hien tai xuong (bo qua). */
+  /** Nút Skip trên UI / phím mũi tên xuống — bay thẻ hiện tại xuống (bỏ qua). */
   function boTheHienTai() {
     const el = theMatTruoc();
     if (el) phongThe(el, "down");

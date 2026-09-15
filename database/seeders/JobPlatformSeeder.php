@@ -27,7 +27,7 @@ class JobPlatformSeeder extends Seeder
         $this->nhetViecLam($companies, $studentId, $now);
     }
 
-    /** Nhet cac cong ty tu COMPANIES (data.js) vao bang companies. */
+    /** Nhét các công ty từ COMPANIES (data.js) vào bảng companies. */
     private function nhetCongTy(mixed $now): array
     {
         $rows = [
@@ -374,7 +374,7 @@ class JobPlatformSeeder extends Seeder
         ];
 
         $skillIds = [];
-        // Tao skill neu chua co, tra ve id — tranh insert trung ten.
+        // Tạo skill nếu chưa có, trả về id — tránh insert trùng tên.
         $damBaoKyNang = function (string $name) use (&$skillIds, $now): int {
             if (! isset($skillIds[$name])) {
                 $skillIds[$name] = DB::table('skills')->insertGetId([

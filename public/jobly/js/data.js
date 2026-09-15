@@ -1,9 +1,9 @@
 /**
- * Jobly — du lieu mau (mock)
+ * Jobly — dữ liệu mẫu (mock)
  *
- * Ham khong dau (layCongTy, layViecTheoId) = minh viet — xem comment tren ham.
- * JOBS / USER / companyId = du lieu, giu tieng Anh de sau nay khop API.
- * find, filter, Number, Object.keys = san cua JavaScript.
+ * Hàm không dấu (layCongTy, layViecTheoId) = mình viết — xem comment trên hàm.
+ * JOBS / USER / companyId = dữ liệu, giữ tiếng Anh để sau này khớp API.
+ * find, filter, Number, Object.keys = sẵn của JavaScript.
  */
 
 /** Hồ sơ user đang đăng nhập — trang Home (“Chào Bảo”) và Profile đọc cái này */

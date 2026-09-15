@@ -1,11 +1,11 @@
 /**
- * Jobly — giao dien + dieu huong
+ * Jobly — giao diện + điều hướng
  *
- * Ten ham khong dau = minh viet. Doc comment ngay tren ham de biet dung lam gi.
- * Ten tieng Anh = san cua trinh duyet / thu vien:
+ * Tên hàm không dấu = mình viết. Đọc comment ngay trên hàm để biết dùng làm gì.
+ * Tên tiếng Anh = sẵn của trình duyệt / thư viện:
  *   querySelector, addEventListener, localStorage, lucide.createIcons, JSON...
- * Class CSS (.job-card) va id HTML giu tieng Anh vi CSS dang dung.
- * Du lieu USER / JOBS giu tieng Anh de sau nay khop API.
+ * Class CSS (.job-card) và id HTML giữ tiếng Anh vì CSS đang dùng.
+ * Dữ liệu USER / JOBS giữ tiếng Anh để sau này khớp API.
  */
 /* =========================================================
    1. STORE
@@ -27,27 +27,27 @@ const Kho = {
       return [];
     }
   },
-  /** Ghi mang id vao localStorage. */
+  /** Ghi mảng id vào localStorage. */
   ghi(key, value) {
     localStorage.setItem(key, JSON.stringify(value));
   },
-  /** Danh sach job id da ung tuyen. */
+  /** Danh sách job id đã ứng tuyển. */
   daUngTuyen() {
     return this.doc(this.key.applied);
   },
-  /** Danh sach job id da bo qua. */
+  /** Danh sách job id đã bỏ qua. */
   daBo() {
     return this.doc(this.key.skipped);
   },
-  /** Danh sach job id da luu (tim). */
+  /** Danh sách job id đã lưu (tim). */
   daLuu() {
     return this.doc(this.key.saved);
   },
-  /** Them job vao danh sach da ung tuyen. */
+  /** Thêm job vào danh sách đã ứng tuyển. */
   themUngTuyen(id) {
     this.ghi(this.key.applied, [...new Set([...this.daUngTuyen(), Number(id)])]);
   },
-  /** Them job vao danh sach da bo qua. */
+  /** Thêm job vào danh sách đã bỏ qua. */
   themBo(id) {
     this.ghi(this.key.skipped, [...new Set([...this.daBo(), Number(id)])]);
   },
@@ -59,18 +59,18 @@ const Kho = {
     this.ghi(this.key.saved, [...ids]);
     return ids.has(n);
   },
-  /** Job nay dang duoc luu hay chua. */
+  /** Job này đang được lưu hay chưa. */
   dangLuu(id) {
     return this.daLuu().includes(Number(id));
   },
-  /** Bat/tat theo doi cong ty; tra ve true neu dang theo doi. */
+  /** Bật/tắt theo dõi công ty; trả về true nếu đang theo dõi. */
   daoTheoDoi(companyId) {
     const ids = new Set(this.doc(this.key.followed));
     ids.has(companyId) ? ids.delete(companyId) : ids.add(companyId);
     this.ghi(this.key.followed, [...ids]);
     return ids.has(companyId);
   },
-  /** Dang theo doi cong ty nay hay chua. */
+  /** Đang theo dõi công ty này hay chưa. */
   dangTheoDoi(companyId) {
     return this.doc(this.key.followed).includes(companyId);
   },
@@ -99,16 +99,16 @@ const MOBILE_NAV = [
   { id: "profile", href: "/profile", label: "Hồ sơ", icon: "user-round" },
 ];
 
-/** Chon 1 phan tu DOM (gon hon querySelector). */
+/** Chọn 1 phần tử DOM (gọn hơn querySelector). */
 const chon = (sel, root = document) => root.querySelector(sel);
-/** Chon tat ca phan tu DOM khop selector. */
+/** Chọn tất cả phần tử DOM khớp selector. */
 const chonHet = (sel, root = document) => [...root.querySelectorAll(sel)];
-/** Lay gia tri ?ten= tren URL. */
+/** Lấy giá trị ?ten= trên URL. */
 const thamSoUrl = (name) => new URLSearchParams(location.search).get(name);
 /** Vẽ lại icon Lucide sau khi innerHTML (data-lucide chỉ là placeholder) */
 const veIcon = () => window.lucide?.createIcons();
 
-/** Doi ky tu < > & " de gan innerHTML an toan. */
+/** Đổi ký tự < > & " để gán innerHTML an toàn. */
 function thoatHtml(str) {
   return String(str)
     .replaceAll("&", "&amp;")
@@ -117,7 +117,7 @@ function thoatHtml(str) {
     .replaceAll('"', "&quot;");
 }
 
-/** Tao the <i data-lucide> — Lucide ve icon that sau khi goi veIcon(). */
+/** Tạo thẻ <i data-lucide> — Lucide vẽ icon thật sau khi gọi veIcon(). */
 function htmlIcon(name) {
   return `<i data-lucide="${name}"></i>`;
 }
@@ -135,7 +135,7 @@ function vienKhop(job, extra = "") {
   </button>`;
 }
 
-/** Dau tick xanh neu cong ty da xac thuc. */
+/** Dấu tick xanh nếu công ty đã xác thực. */
 function htmlXacThuc(company) {
   return company.verified ? `<span class="verified">${htmlIcon("badge-check")}</span>` : "";
 }
@@ -171,14 +171,14 @@ function chaySo(el, target, suffix = "") {
   requestAnimationFrame(tick);
 }
 
-/** HTML vong tron % (AI score). CSS --p dieu khien stroke; data-score de chayVongDiem doc. */
+/** HTML vòng tròn % (AI score). CSS --p điều khiển stroke; data-score để chayVongDiem đọc. */
 function vongDiem(value, id = "") {
   return `<div class="score-ring" ${id ? `id="${id}"` : ""} style="--p:0" data-score="${value}">
     <strong>0%</strong>
   </div>`;
 }
 
-/** Chay animation stroke vong diem sau khi ve HTML. */
+/** Chạy animation stroke vòng điểm sau khi vẽ HTML. */
 function chayVongDiem(root = document) {
   chonHet(".score-ring", root).forEach((ring) => {
     const v = Number(ring.dataset.score);
@@ -194,7 +194,7 @@ function chayVongDiem(root = document) {
    Vẽ khung dùng chung mọi trang. body[data-page] quyết định mục nav active.
    Rail desktop = cột phải; mobile = FAB + bottom sheet.
    ========================================================= */
-/** Id muc menu tuong ung trang hien tai (data-page). */
+/** Id mục menu tương ứng trang hiện tại (data-page). */
 function idMenuDangMo() {
   const page = document.body.dataset.page;
   if (page === "explore" && thamSoUrl("saved") === "1") return "saved";
@@ -203,7 +203,7 @@ function idMenuDangMo() {
   return page;
 }
 
-/** Ve sidebar, bottom nav, rail rong — dung chung moi trang. */
+/** Vẽ sidebar, bottom nav, rail rỗng — dùng chung mọi trang. */
 function veKhung() {
   const active = idMenuDangMo();
   const sidebar = chon("#sidebar");
@@ -297,7 +297,7 @@ function veKhung() {
    Dữ liệu vẫn từ USER / JOBS / layViecTheoId — sau này swap sang API.
    ========================================================= */
 const CotPhai = {
-  /** The AI Career Assistant tren cot phai. */
+  /** Thẻ AI Career Assistant trên cột phải. */
   hoSoAI() {
     return `
       <div class="ai-profile-card">
@@ -307,7 +307,7 @@ const CotPhai = {
       </div>`;
   },
 
-  /** 4 o so: apply / phong van / hired / match. */
+  /** 4 ô số: apply / phỏng vấn / hired / match. */
   thongKeNhanh() {
     const s = USER.stats;
     return `
@@ -350,7 +350,7 @@ const CotPhai = {
       </section>`;
   },
 
-  /** The CV Match Profile / career. */
+  /** Thẻ CV Match Profile / career. */
   theSuNghiep() {
     return `
       <div class="career-card">
@@ -380,7 +380,7 @@ const CotPhai = {
       </div>`;
   },
 
-  /** Tom tat tien trinh don ung tuyen. */
+  /** Tóm tắt tiến trình đơn ứng tuyển. */
   tomTatDon(items) {
     const viewed = items.filter((a) => a.steps.find((s) => s.key === "viewed")?.status !== "upcoming").length;
     const interview = items.filter((a) => a.steps.find((s) => s.key === "interview")?.status !== "upcoming").length;
@@ -395,7 +395,7 @@ const CotPhai = {
       </section>`;
   },
 
-  /** Vong diem ho so AI tren rail trang Profile. */
+  /** Vòng điểm hồ sơ AI trên rail trang Profile. */
   diemHoSo() {
     return `
       <div class="card section" style="margin-top:0">
@@ -415,7 +415,7 @@ const CotPhai = {
       </div>`;
   },
 
-  /** So lieu cong ty tren rail. */
+  /** Số liệu công ty trên rail. */
   thongKeCongTy(company) {
     return `
       <section>
@@ -429,7 +429,7 @@ const CotPhai = {
       </section>`;
   },
 
-  /** The cong ty nho tren rail trang chi tiet. */
+  /** Thẻ công ty nhỏ trên rail trang chi tiết. */
   congTyMini(company) {
     return `
       <a class="card card--hover mini-company" href="/companies?id=${company.id}">
@@ -454,7 +454,7 @@ function doCotPhai(html) {
    hangViec   = 1 dòng trong danh sách Explore / Company.
    Modal + save-heart dùng event delegation (ganClickToanTrang).
    ========================================================= */
-/** HTML ben trong 1 the vuot (Home). */
+/** HTML bên trong 1 thẻ vuốt (Home). */
 function ruotTheViec(job) {
   const company = layCongTy(job.companyId);
   return `
@@ -487,7 +487,7 @@ function ruotTheViec(job) {
     </div>`;
 }
 
-/** 1 dong viec trong danh sach Explore / company. */
+/** 1 dòng việc trong danh sách Explore / company. */
 function hangViec(job, i = 0) {
   const c = layCongTy(job.companyId);
   return `
@@ -514,7 +514,7 @@ function hangViec(job, i = 0) {
     </article>`;
 }
 
-/** Mo overlay AI giai thich % match. */
+/** Mở overlay AI giải thích % match. */
 function moHopKhop(jobId) {
   const job = layViecTheoId(jobId);
   if (!job) return;
@@ -539,10 +539,10 @@ function moHopKhop(jobId) {
 }
 
 /**
- * Click toan cuc (mot lan luc boot):
+ * Click toàn cục (một lần lúc boot):
  * - [data-open-match] → modal AI
- * - [data-close-modal] / click overlay / Escape → dong
- * - [data-save] → dao luu job
+ * - [data-close-modal] / click overlay / Escape → đóng
+ * - [data-save] → đảo lưu job
  */
 function ganClickToanTrang() {
   document.addEventListener("click", (e) => {
@@ -569,7 +569,7 @@ function ganClickToanTrang() {
   });
 }
 
-/** Chuyen sang /jobs?id= */
+/** Chuyển sang /jobs?id= */
 function toiChiTiet(id) {
   location.href = `/jobs?id=${id}`;
 }
@@ -589,13 +589,13 @@ function toiTrangKhop(id) {
    Deck 3 card chồng nhau. Ẩn job đã apply/skip.
    BoVuot: ứng tuyển → /match, bỏ → đổ thẻ mới, bấm → /jobs?id=
    ---------- */
-/** Job chua apply/skip — dung de ve chong the Home. */
+/** Job chưa apply/skip — dùng để vẽ chồng thẻ Home. */
 function viecChoChongThe() {
   const hidden = new Set([...Kho.daUngTuyen(), ...Kho.daBo()]);
   return JOBS.filter((j) => !hidden.has(j.id)).sort((a, b) => b.match - a.match);
 }
 
-/** Ve 3 the vuot dau tien vao #card-stack. */
+/** Vẽ 3 thẻ vuốt đầu tiên vào #card-stack. */
 function veChongThe() {
   const stack = chon("#card-stack");
   if (!stack) return;
@@ -641,7 +641,7 @@ function doLaiChongThe() {
   }
 }
 
-/** Khoi tao trang Home: rail + chong the + BoVuot. */
+/** Khởi tạo trang Home: rail + chồng thẻ + BoVuot. */
 function khoiTrangHome() {
   doCotPhai(`${CotPhai.hoSoAI()}${CotPhai.thongKeNhanh()}${CotPhai.viecGoiY()}${CotPhai.theSuNghiep()}`);
 
@@ -694,7 +694,7 @@ function khoiTrangHome() {
    Danh sách job + chip lọc (all / saved / Remote / type).
    ?saved=1 mở thẳng tab Đã lưu. Search lọc theo title/company/location/skills.
    ---------- */
-/** Khoi tao trang Explore: loc, tim, danh sach viec. */
+/** Khởi tạo trang Explore: lọc, tìm, danh sách việc. */
 function khoiTrangKhamPha() {
   const list = chon("#job-list");
   if (!list) return;
@@ -756,7 +756,7 @@ function khoiTrangKhamPha() {
    /jobs?id= — mô tả, yêu cầu, quyền lợi, CTA apply.
    Đã apply thì nút chuyển sang /applications.
    ---------- */
-/** Khoi tao trang chi tiet 1 job. */
+/** Khởi tạo trang chi tiết 1 job. */
 function khoiTrangChiTiet() {
   const root = chon("#detail-root");
   if (!root) return;
@@ -826,7 +826,7 @@ function khoiTrangChiTiet() {
    Màn hình "đã apply thành công" + confetti.
    Đảm bảo jobId nằm trong Kho.applied dù vào thẳng URL.
    ---------- */
-/** Hieu ung confetti trang Match. */
+/** Hiệu ứng confetti trang Match. */
 function phaoGiay() {
   const colors = ["#6366f1", "#2dd4bf", "#f472b6", "#f59e0b", "#8b5cf6", "#3b82f6"];
   for (let i = 0; i < 44; i += 1) {
@@ -841,7 +841,7 @@ function phaoGiay() {
   }
 }
 
-/** Khoi tao trang Match (ung tuyen thanh cong). */
+/** Khởi tạo trang Match (ứng tuyển thành công). */
 function khoiTrangKhop() {
   const root = chon("#match-root");
   if (!root) return;
@@ -900,7 +900,7 @@ function khoiTrangKhop() {
    messagesById giữ tin trong RAM (mất khi reload). Recruiter reply giả sau 1.1s.
    Màu chủ đề lưu localStorage theo conv id.
    ---------- */
-/** Khoi tao trang Chat 3 cot. */
+/** Khởi tạo trang Chat 3 cột. */
 function khoiTrangChat() {
   const layout = chon("#chat-layout");
   if (!layout) return;
@@ -1191,7 +1191,7 @@ function khoiTrangChat() {
 /* ---------- APPLICATIONS ----------
    Timeline mock từ APPLICATIONS (data.js) + job user vừa apply (Store) chưa có trong mock.
    ---------- */
-/** Khoi tao trang timeline don ung tuyen. */
+/** Khởi tạo trang timeline đơn ứng tuyển. */
 function khoiTrangDon() {
   const list = chon("#app-list");
   if (!list) return;
@@ -1247,7 +1247,7 @@ function khoiTrangDon() {
 /* ---------- PROFILE ----------
    Hồ sơ USER từ data.js. Nút sửa / thêm skill / CV mới chỉ toast (chưa API).
    ---------- */
-/** Khoi tao trang ho so USER. */
+/** Khởi tạo trang hồ sơ USER. */
 function khoiTrangHoSo() {
   const root = chon("#profile-root");
   if (!root) return;
@@ -1319,7 +1319,7 @@ function khoiTrangHoSo() {
 /* ---------- COMPANY ----------
    /companies?id= — hero, tab Giới thiệu / Việc làm / Đánh giá, follow (Store).
    ---------- */
-/** Khoi tao trang cong ty. */
+/** Khởi tạo trang công ty. */
 function khoiTrangCongTy() {
   const root = chon("#company-root");
   if (!root) return;
