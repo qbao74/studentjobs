@@ -7,3 +7,5 @@ Route::view('/','home')->name('home');
 Route::view('/explore','explore')->name('explore');
 
 Route::view('/jobs', 'jobs')->name('jobs');
+
+Route::view('/match', 'match')->name('match');
