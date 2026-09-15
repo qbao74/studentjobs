@@ -2019,9 +2019,11 @@ body[data-page="match"] .main {
    .chat-thread = vùng tin nhắn cuộn   .chat-input = ô gửi
    Mobile: mục 19 ẩn cột, class .show-list do JS gắn.
    ------------------------------------------------------------ */
-body[data-page="chat"] .app .main {
-  padding-bottom: 28px;
+/* Chat không có rail: bỏ trần 1180px để khung 3 cột tràn hết chỗ cột phải */
+body[data-page="chat"] .app:not(.has-rail) .main {
   max-width: none;
+  width: 100%;
+  padding: 20px 24px 24px;
 }
 
 /* 3 cột: mọi cột đều minmax(0, …) + min-width:0 để không bao giờ tràn ngang */

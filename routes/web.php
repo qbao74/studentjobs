@@ -15,3 +15,5 @@ Route::view('/applications', 'applications')->name('applications');
 Route::view('/profile', 'profile')->name('profile');
 
 Route::view('/companies', 'companies')->name('companies');
+
+Route::view('/chat', 'chat')->name('chat');
