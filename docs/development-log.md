@@ -59,7 +59,7 @@ Cần kiểm tra:
 - `composer.json`, rồi chạy `composer update <tên-gói>`.
 - Commit cả `composer.lock` sau khi đổi.
 
-## Commit: _(điền ở cuối phase)_
+## Commit: 31342e2
 
 ### Tiêu đề
 docs: Tạo nhật ký phát triển và ghi lại các phase đã làm trước đó
