@@ -42,7 +42,7 @@ class AiReadingTest extends TestCase
         ]);
 
         app(CvService::class)->upload($student, new UploadedFile(
-            CvFiles::docx("Mình từng xây giao diện web cho câu lạc bộ suốt một năm.\nEmail: sv@gmail.com"),
+            CvFiles::docx("Mình từng xây giao diện web cho câu lạc bộ suốt một năm.\nSống ở TP.HCM.\nEmail: sv@gmail.com"),
             'cv.docx',
             null,
             null,
@@ -116,7 +116,7 @@ class AiReadingTest extends TestCase
                 'is_remote' => false,
                 'type' => 'Part-time',
                 'hours' => '3 giờ/ngày',
-                'description' => 'Cần biết PHP để sửa web. Có Canva là lợi thế khi làm ảnh đăng bài.',
+                'description' => 'Cần biết PHP để sửa web. Có Canva là lợi thế khi làm ảnh đăng bài. Văn phòng ở Hà Nội.',
                 'requirements' => [],
                 'benefits' => [],
             ],

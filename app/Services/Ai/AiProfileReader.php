@@ -3,6 +3,7 @@
 namespace App\Services\Ai;
 
 use App\Models\Skill;
+use App\Support\TextNormalizer;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
@@ -113,8 +114,8 @@ class AiProfileReader
         return new ProfileDocument(
             skills: $this->skills($payload['skills'] ?? [], $source, $allowed),
             field: $this->code($payload['field'] ?? null, 'matching.fields'),
-            city: $this->code($payload['city'] ?? null, 'matching.cities'),
-            remote: filter_var($payload['remote'] ?? false, FILTER_VALIDATE_BOOLEAN),
+            city: $this->groundedCity($payload['city'] ?? null, $source),
+            remote: $this->groundedRemote($payload['remote'] ?? false, $source),
             experience: $this->experience($payload['experience'] ?? [], $source),
         );
     }
@@ -205,6 +206,43 @@ class AiProfileReader
         }
 
         return $evidence;
+    }
+
+    /** Thành phố và remote chỉ giữ khi chữ gốc thật sự nói tới, không nhận chỗ mô hình tự điền. */
+    private function groundedCity(mixed $value, string $source): ?string
+    {
+        $code = $this->code($value, 'matching.cities');
+
+        if ($code === null) {
+            return null;
+        }
+
+        $normalized = TextNormalizer::normalize($source);
+
+        foreach (config('matching.cities')[$code] as $name) {
+            if (TextNormalizer::containsTerm($normalized, $name)) {
+                return $code;
+            }
+        }
+
+        return null;
+    }
+
+    private function groundedRemote(mixed $value, string $source): bool
+    {
+        if (! filter_var($value, FILTER_VALIDATE_BOOLEAN)) {
+            return false;
+        }
+
+        $normalized = TextNormalizer::normalize($source);
+
+        foreach (['remote', 'tu xa', 'lam tu xa', 'work from home'] as $term) {
+            if (TextNormalizer::containsTerm($normalized, $term)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function code(mixed $value, string $configKey): ?string

@@ -41,6 +41,8 @@ class FeatureExtractor
             $fields = array_values(array_unique([...$fields, $aiField]));
         }
 
+        $notes = $this->skillNotes($analyzed['skills'] ?? []);
+
         return new JobRequirements(
             jobId: $job->id,
             requiredSkills: $required,
@@ -49,6 +51,7 @@ class FeatureExtractor
             fields: $fields,
             city: $this->detectCity((string) $job->location) ?? $this->knownCode($analyzed['city'] ?? null, 'matching.cities'),
             isRemote: (bool) $job->is_remote,
+            skillEvidence: $notes['evidence'],
         );
     }
 
@@ -66,17 +69,21 @@ class FeatureExtractor
             $fields = array_values(array_unique([...$fields, $aiField]));
         }
 
+        $notes = $this->skillNotes($parsed['skills'] ?? []);
+
         return new StudentFeatures(
             studentId: $student->id,
             skills: $student->skills->pluck('name', 'id')->all(),
             keywords: array_values(array_unique(array_merge(
                 TextNormalizer::keywords((string) $student->bio),
                 TextNormalizer::keywords((string) $student->major),
-                $parsed['keywords'] ?? [],
+                is_array($parsed['keywords'] ?? null) ? $parsed['keywords'] : [],
             ))),
             fields: $fields,
             city: $this->detectCity((string) $student->location) ?? $this->knownCode($parsed['city'] ?? null, 'matching.cities'),
             hasCv: $student->cv?->parse_status === 'parsed',
+            skillEvidence: $notes['evidence'],
+            skillImportance: $notes['importance'],
         );
     }
 
@@ -120,5 +127,36 @@ class FeatureExtractor
         }
 
         return $code;
+    }
+
+    /**
+     * @return array{evidence: array<int, string>, importance: array<int, string>}
+     */
+    private function skillNotes(mixed $skills): array
+    {
+        $evidence = [];
+        $importance = [];
+
+        if (! is_array($skills)) {
+            return ['evidence' => [], 'importance' => []];
+        }
+
+        foreach ($skills as $skill) {
+            if (! is_array($skill) || ! isset($skill['id'])) {
+                continue;
+            }
+
+            $id = (int) $skill['id'];
+
+            if (is_string($skill['evidence'] ?? null) && $skill['evidence'] !== '') {
+                $evidence[$id] = $skill['evidence'];
+            }
+
+            if (is_string($skill['importance'] ?? null) && $skill['importance'] !== '') {
+                $importance[$id] = $skill['importance'];
+            }
+        }
+
+        return ['evidence' => $evidence, 'importance' => $importance];
     }
 }

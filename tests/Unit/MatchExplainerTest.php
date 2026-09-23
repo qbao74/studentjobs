@@ -17,7 +17,7 @@ class MatchExplainerTest extends TestCase
 
         $result = (new MatchScorer)->score($student, $job);
 
-        return (new MatchExplainer)->explain($result, $student) + ['score' => $result->score];
+        return (new MatchExplainer)->explain($result, $student, $job) + ['score' => $result->score];
     }
 
     public function test_pros_and_cons_name_the_actual_skills(): void
@@ -37,6 +37,27 @@ class MatchExplainerTest extends TestCase
         $this->assertSame('Rất phù hợp', $e['level']);
         $this->assertStringStartsWith("Rất phù hợp ({$e['score']}%).", $e['comment']);
         $this->assertStringContainsString('đủ kỹ năng', $e['comment']);
+    }
+
+    public function test_cv_edit_quotes_the_sentence_the_model_extracted(): void
+    {
+        $job = new JobRequirements(
+            1,
+            [1 => 'PHP', 2 => 'SQL'],
+            [3 => 'Git'],
+            ['backend'],
+            ['it'],
+            'hcm',
+            false,
+            skillEvidence: [2 => 'bắt buộc biết SQL'],
+        );
+        $student = new StudentFeatures(1, [1 => 'PHP'], ['backend'], ['it'], 'hcm', true);
+        $result = (new MatchScorer)->score($student, $job);
+
+        $comment = (new MatchExplainer)->explain($result, $student, $job)['comment'];
+
+        $this->assertStringContainsString('«bắt buộc biết SQL»', $comment);
+        $this->assertStringContainsString('thêm vào CV', $comment);
     }
 
     public function test_suggests_uploading_cv_when_missing(): void

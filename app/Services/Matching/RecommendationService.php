@@ -83,7 +83,7 @@ class RecommendationService
     private function run(StudentFeatures $student, JobRequirements $job): array
     {
         $result = $this->scorer->score($student, $job);
-        $explanation = $this->explainer->explain($result, $student);
+        $explanation = $this->explainer->explain($result, $student, $job);
 
         return [
             'score' => $result->score,
