@@ -725,4 +725,153 @@ Controller (Phase 06) → `CvService::upload($student, $file)` → `detectType` 
 Cần kiểm tra:
 - Đổi trọng số độ đầy đủ: `ProfileScoreCalculator::CRITERIA` (tổng phải bằng 100).
 
+---
+
+# PHASE 05 — Matching Engine
+
+Toàn bộ pipeline, mỗi bước là một class riêng:
+
+| Bước | Class | Dữ liệu ra |
+|---|---|---|
+| INPUT | `Student`, `JobPost`, file CV | dữ liệu thô |
+| DATA EXTRACTION | `CvTextExtractor` | chữ thô (`cvs.extracted_text`) |
+| NORMALIZATION | `TextNormalizer` | chữ chuẩn hóa |
+| FEATURE EXTRACTION | `CvParser`, `FeatureExtractor::forStudent` | `StudentFeatures` |
+| REQUIREMENT ANALYSIS | `FeatureExtractor::forJob` | `JobRequirements` |
+| MATCHING + SCORING | `MatchScorer` | `MatchResult` (tổng + điểm từng tiêu chí) |
+| EXPLANATION | `MatchExplainer` | `pros`, `cons`, `comment` |
+| RECOMMENDATION | `RecommendationService` | bảng `job_recommendations` |
+
+## Commit: 85f9935
+
+### Tiêu đề
+feat: Phân tích yêu cầu tin tuyển và trích đặc trưng hồ sơ sinh viên
+
+### Ngày
+2026-09-23
+
+### Mục đích
+Đưa hai phía về cùng một "ngôn ngữ" trước khi so: tập kỹ năng, tập từ khóa, lĩnh vực, thành phố.
+
+### Đã làm
+- `config/matching.php`: trọng số, ngưỡng mức độ, từ điển lĩnh vực, tên thành phố.
+- `JobRequirements`, `StudentFeatures`: `readonly class`, chỉ chứa dữ liệu.
+- `FeatureExtractor::forJob()`: tách kỹ năng bắt buộc/điểm cộng, từ khóa từ tiêu đề + mô tả + yêu cầu, lĩnh vực, thành phố, remote.
+- `FeatureExtractor::forStudent()`: kỹ năng (tự chọn + CV), từ khóa từ giới thiệu + ngành + CV, lĩnh vực theo ngành, thành phố.
+- Bỏ từ `it` khỏi lĩnh vực CNTT vì chữ "ít" bỏ dấu cũng thành "it" (có test).
+
+### Luồng code
+`forJob($job)` → `loadMissing('skills')` → chia theo `pivot->is_required` → `TextNormalizer::keywords` → `detectFields` → `detectCity`.
+
+### File quan trọng
+- `config/matching.php`
+- `app/Services/Matching/FeatureExtractor.php`, `JobRequirements.php`, `StudentFeatures.php`
+
+### Kiến thức cần nhớ
+- Tách "dữ liệu thô" (model) khỏi "đặc trưng" (DTO) để bộ chấm điểm không cần database, test nhanh và chắc.
+- Luật nghiệp vụ đặt trong `config/`, đổi không cần sửa code.
+
+### Nếu muốn sửa chức năng này
+Cần kiểm tra:
+- Thêm lĩnh vực: thêm vào `matching.fields` (dạng bỏ dấu, chữ thường).
+
+## Commit: fdf11dc
+
+### Tiêu đề
+feat: Chấm điểm khớp việc theo từng tiêu chí có trọng số
+
+### Ngày
+2026-09-23
+
+### Mục đích
+Ra một con số giải thích được, không phải "hộp đen".
+
+### Đã làm
+- 4 tiêu chí: Kỹ năng 60, Kinh nghiệm & mô tả 20, Ngành học 10, Địa điểm 10.
+- Kỹ năng bắt buộc tính trọng số 2, điểm cộng tính 1.
+- Từ khóa: trùng 35% số từ khóa của tin là đạt tối đa.
+- Tiêu chí thiếu dữ liệu thì `applicable = false`: bị bỏ và chia lại tỷ trọng, không trừ điểm oan.
+
+### Luồng code
+`score($student, $job)` → 4 hàm tiêu chí trả `{score, applicable, detail}` → `total()` = Σ(trọng số × điểm) / Σ trọng số của tiêu chí áp dụng.
+
+### File quan trọng
+- `app/Services/Matching/MatchScorer.php`, `MatchResult.php`
+- `tests/Unit/MatchScorerTest.php` (có ví dụ tính tay: 71 và 73 điểm)
+
+### Kiến thức cần nhớ
+- Ví dụ: tin cần PHP, SQL, Laravel (bắt buộc) + Git (cộng) → tổng trọng số 7. Thiếu Laravel → 5/7 = 71.
+- Hàm thuần (*pure function*): không đọc database, không phụ thuộc thời gian, nên test bằng số cụ thể được.
+
+### Nếu muốn sửa chức năng này
+Cần kiểm tra:
+- Đổi trọng số trong `config/matching.php` → chạy `php artisan matching:refresh`, và sửa các con số kỳ vọng trong test.
+
+## Commit: c06e94c
+
+### Tiêu đề
+feat: Sinh lời giải thích và gợi ý cải thiện từ kết quả khớp
+
+### Ngày
+2026-09-23
+
+### Mục đích
+Sinh viên cần biết vì sao được 59% và làm gì để tăng.
+
+### Đã làm
+- `pros`: kỹ năng đã có, tiêu chí đạt ≥ 50.
+- `cons`: kỹ năng thiếu, tiêu chí dưới 50.
+- `comment`: mức độ + điểm + gợi ý học kỹ năng thiếu (tối đa 3) + nhắc tải CV nếu chưa có.
+- Mức độ: ≥ 80 Rất phù hợp, ≥ 60 Khá, ≥ 40 Một phần, còn lại Chưa phù hợp.
+
+### Luồng code
+`explain(MatchResult, StudentFeatures)` → ghép câu từ `matchedRequired`, `missingRequired` và `detail` của từng tiêu chí.
+
+### File quan trọng
+- `app/Services/Matching/MatchExplainer.php`
+- `tests/Unit/MatchExplainerTest.php`
+
+### Kiến thức cần nhớ
+- Lời giải thích chỉ dùng dữ liệu có trong `MatchResult`, nên không bao giờ nói điều hệ thống không biết.
+
+### Nếu muốn sửa chức năng này
+Cần kiểm tra:
+- Đổi câu chữ: `MatchExplainer::comment()`. Đổi ngưỡng: `matching.levels`.
+
+## Commit: 33efa9d
+
+### Tiêu đề
+feat: Lưu kết quả khớp và tự tính lại khi hồ sơ hoặc CV thay đổi
+
+### Ngày
+2026-09-23
+
+### Mục đích
+Trang "Việc hợp với bạn" đọc điểm có sẵn thay vì chấm lại mỗi lần mở trang.
+
+### Đã làm
+- `RecommendationService`: `evaluate()` (chấm, không lưu), `refreshForStudent()`, `refreshForJob()` (tin đóng/ẩn thì xóa gợi ý), `refreshAll()`.
+- Lưu bằng `upsert` theo cặp `(student_id, job_post_id)`: chạy nhiều lần không sinh bản ghi trùng.
+- `ProfileRefresher::refresh()`: chấm lại độ đầy đủ + điểm khớp. `CvService` gọi sau khi tải hoặc xóa CV.
+- Lệnh `php artisan matching:refresh`.
+- `DatabaseSeeder` tính điểm bằng pipeline thật sau khi seed (điểm hồ sơ 82 viết tay trước đây giờ là 80 tính thật).
+
+### Luồng code
+Tải CV → `CvService::upload` → `ProfileRefresher::refresh` → `RecommendationService::refreshForStudent` → mỗi tin đang mở: `FeatureExtractor` → `MatchScorer` → `MatchExplainer` → `upsert`.
+
+### File quan trọng
+- `app/Services/Matching/RecommendationService.php`
+- `app/Services/Profile/ProfileRefresher.php`
+- `routes/console.php`, `database/seeders/DatabaseSeeder.php`
+- `tests/Feature/Matching/RecommendationServiceTest.php`
+
+### Kiến thức cần nhớ
+- `upsert` = insert, trùng khóa thì update, gói trong một câu SQL.
+- `chunkById(200)` đọc sinh viên theo lô, không nạp hết vào RAM.
+- Hiện tính đồng bộ (8 tin × vài sinh viên là rất nhanh). Khi dữ liệu lớn, chuyển `refreshForJob` sang queue job.
+
+### Nếu muốn sửa chức năng này
+Cần kiểm tra:
+- Mọi chỗ đổi hồ sơ, kỹ năng, CV phải gọi `ProfileRefresher::refresh`. Mọi chỗ đổi tin phải gọi `refreshForJob`.
+
 <!-- mục-tiếp-theo -->
