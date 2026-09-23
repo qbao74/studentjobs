@@ -427,4 +427,196 @@ Sau `migrate:fresh --seed` là đăng nhập thử được cả ba vai trò và
 Cần kiểm tra:
 - Thêm kỹ năng mới: thêm vào `skills` của tin, và vào `ALIASES` nếu muốn nhận diện trong CV.
 
+---
+
+# PHASE 03 — Xác thực và phân quyền
+
+## Commit: 4c041df
+
+### Tiêu đề
+refactor: Dùng enum Role cho phân quyền và điều hướng sau đăng nhập
+
+### Ngày
+2026-09-23
+
+### Mục đích
+Bảng điều hướng theo vai trò (`employer` → `/employer`...) bị viết lặp ở `LoginController` và `bootstrap/app.php`. Gom về `Role::homePath()`.
+
+### Đã làm
+- `User` cast `role` sang `Role`, thêm `hasRole(Role ...$roles)`.
+- `EnsureRole` đổi chuỗi trong route (`role:student`) sang enum bằng `Role::from`.
+- Hành vi giữ nguyên.
+
+### Luồng code
+Request → middleware `role:student` → `EnsureRole::handle($request, $next, 'student')` → `Role::from('student')` → `$user->hasRole(...)` → không khớp thì `abort(403)`.
+
+### File quan trọng
+- `app/Models/User.php`, `app/Http/Middleware/EnsureRole.php`, `bootstrap/app.php`
+
+### Kiến thức cần nhớ
+- `array_map(Role::from(...), $roles)`: cú pháp `Role::from(...)` biến method thành *closure* (first-class callable).
+- Refactor là đổi cấu trúc, không đổi hành vi, nên test cũ phải vẫn qua.
+
+### Nếu muốn sửa chức năng này
+Cần kiểm tra:
+- Đổi trang đầu của một vai trò: sửa `Role::homePath()`.
+
+## Commit: 574c074
+
+### Tiêu đề
+feat: Giới hạn số lần đăng nhập sai và chặn tài khoản bị khóa
+
+### Ngày
+2026-09-23
+
+### Mục đích
+Chống dò mật khẩu. Tài khoản bị admin khóa không vào được, kể cả khi đang đăng nhập dở.
+
+### Đã làm
+- `LoginRequest::authenticate()`: sai 5 lần trong 60 giây theo cặp email + IP thì khóa tạm.
+- Tài khoản `is_active = false`: đăng xuất ngay sau `Auth::attempt` và báo lỗi.
+- Middleware `EnsureUserIsActive` gắn vào nhóm `web`: đang đăng nhập mà bị khóa thì request kế tiếp bị đăng xuất.
+
+### Luồng code
+POST `/login` → `LoginRequest` validate → `authenticate()` → `RateLimiter` → `Auth::attempt` → kiểm tra `is_active` → `session()->regenerate()` → `redirect()->intended(homePath)`.
+
+### File quan trọng
+- `app/Http/Requests/Auth/LoginRequest.php`
+- `app/Http/Middleware/EnsureUserIsActive.php`
+- `app/Http/Controllers/Auth/LoginController.php`
+
+### Kiến thức cần nhớ
+- *Form Request* gom validate + logic đầu vào, giúp controller gọn.
+- `session()->regenerate()` sau đăng nhập chống *session fixation*.
+- Thông báo lỗi giống nhau cho "sai email" và "sai mật khẩu", để người ngoài không dò được email nào có tài khoản.
+
+### Nếu muốn sửa chức năng này
+Cần kiểm tra:
+- `MAX_ATTEMPTS` và số giây trong `RateLimiter::hit`.
+
+## Commit: cc138c4
+
+### Tiêu đề
+feat: Chuyển thông báo kiểm tra dữ liệu sang tiếng Việt
+
+### Ngày
+2026-09-23
+
+### Mục đích
+Lỗi form đang hiện "The email field is required".
+
+### Đã làm
+- `lang/vi/validation.php` với các rule đang dùng.
+- `APP_LOCALE=vi`, `APP_FAKER_LOCALE=vi_VN` trong `.env.example` (máy bạn đã đổi `.env`).
+
+### Luồng code
+Validate lỗi → Laravel tìm `lang/{APP_LOCALE}/validation.php` → thay `:attribute`.
+
+### File quan trọng
+- `lang/vi/validation.php`, `.env.example`
+
+### Kiến thức cần nhớ
+- `:Attribute` (viết hoa) in hoa chữ đầu, `:attribute` giữ nguyên.
+- Tên trường tiếng Việt đặt trong `attributes()` của Form Request hoặc mảng `attributes` của file lang.
+
+### Nếu muốn sửa chức năng này
+Cần kiểm tra:
+- Rule chưa có câu tiếng Việt sẽ hiện key thô như `validation.xxx`: thêm vào file lang.
+
+## Commit: 481e01e
+
+### Tiêu đề
+feat: Cho nhà tuyển dụng đăng ký kèm tạo công ty
+
+### Ngày
+2026-09-23
+
+### Mục đích
+Trước đây chỉ sinh viên đăng ký được. Nhà tuyển dụng cần tài khoản gắn với một công ty.
+
+### Đã làm
+- `RegistrationService`: `registerStudent`, `registerEmployer` (tạo `users` + `companies` + `employers` trong một transaction, slug không trùng, màu logo cố định theo tên).
+- `RegisterRequest` dùng chung. Route employer thêm trường công ty. Mật khẩu ≥ 8 ký tự, có chữ và số.
+- Route `/register/employer`. Hai route POST có `throttle:10,1`.
+- Tách `auth/layout.blade.php`. Form có tab Sinh viên / Nhà tuyển dụng. Trang login có link sang đăng ký.
+
+### Luồng code
+POST `/register/employer` → `RegisterRequest` (`isEmployer()` theo tên route) → `RegisterController::store` → `RegistrationService::registerEmployer` → `Auth::login` → `/employer`.
+
+### File quan trọng
+- `app/Services/Auth/RegistrationService.php`
+- `app/Http/Requests/Auth/RegisterRequest.php`
+- `app/Http/Controllers/Auth/RegisterController.php`
+- `resources/views/auth/*.blade.php`
+
+### Kiến thức cần nhớ
+- Service chứa nghiệp vụ, controller chỉ nhận request và trả response.
+- `role` không lấy từ form, nên gửi thêm `role=admin` cũng vô ích (đã có test chứng minh).
+- Công ty mới có `verified = false`, admin xác thực sau.
+
+### Nếu muốn sửa chức năng này
+Cần kiểm tra:
+- Thêm trường công ty: `RegisterRequest::rules()` → `RegistrationService::registerEmployer` → form.
+
+## Commit: 86a0832
+
+### Tiêu đề
+feat: Thêm policy kiểm soát quyền với tin tuyển, đơn và CV
+
+### Ngày
+2026-09-23
+
+### Mục đích
+Middleware `role` chỉ biết "bạn là ai". Policy trả lời "bạn có được đụng vào bản ghi này không": HR công ty A không sửa được tin của công ty B.
+
+### Đã làm
+- `JobPostPolicy`: `view` (tin đóng/ẩn chỉ chủ và admin), `create`, `update` (tin bị admin ẩn thì không tự mở lại), `delete`, `moderate`.
+- `ApplicationPolicy`: `view`, `updateStatus` (không đổi đơn đã có kết quả), `message`, `withdraw`.
+- `CvPolicy::download`: HR chỉ tải CV của sinh viên đã nộp vào công ty mình.
+- `User::companyId()`.
+
+### Luồng code
+Controller gọi `$this->authorize('update', $job)` hoặc `Gate::authorize(...)` → Laravel tìm `JobPostPolicy::update` theo tên model → `false` thì 403.
+
+### File quan trọng
+- `app/Policies/*.php`
+
+### Kiến thức cần nhớ
+- Laravel tự tìm policy theo quy ước tên `App\Models\X` → `App\Policies\XPolicy`.
+- Tham số `?User $user` cho phép khách (chưa đăng nhập) đi vào policy.
+
+### Nếu muốn sửa chức năng này
+Cần kiểm tra:
+- `tests/Feature/Auth/AuthorizationTest.php`.
+
+## Commit: 8fa691a
+
+### Tiêu đề
+test: Kiểm thử đăng nhập, đăng ký và phân quyền
+
+### Ngày
+2026-09-23
+
+### Mục đích
+Chứng minh các luật ở trên đúng, và báo ngay nếu sau này ai sửa làm hỏng.
+
+### Đã làm
+- `LoginTest` (7 test): đúng/sai mật khẩu, tài khoản khóa, khóa giữa phiên, giới hạn số lần, đăng xuất.
+- `RegisterTest` (6 test): sinh viên, nhà tuyển dụng, slug trùng, thiếu tên công ty, chèn `role`, email trùng + mật khẩu yếu.
+- `AuthorizationTest` (7 test): trang công khai, chuyển về login, 403, policy tin/đơn/CV.
+
+### Luồng code
+`php artisan test` → `RefreshDatabase` chạy migrate trên SQLite `:memory:` → mỗi test chạy trong transaction rồi rollback.
+
+### File quan trọng
+- `tests/Feature/Auth/*.php`, `phpunit.xml`
+
+### Kiến thức cần nhớ
+- Test đặt tên theo hành vi (`test_locked_account_cannot_log_in`), đọc tên là biết luật.
+- `assertSessionHasErrors`, `assertAuthenticatedAs`, `assertForbidden` là các assert hay dùng nhất.
+
+### Nếu muốn sửa chức năng này
+Cần kiểm tra:
+- `php artisan test --filter=LoginTest`.
+
 <!-- mục-tiếp-theo -->
