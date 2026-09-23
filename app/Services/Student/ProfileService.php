@@ -39,7 +39,7 @@ class ProfileService
             ->map(fn (string $n) => Str::squish($n))
             ->filter()
             ->unique(fn (string $n) => Str::lower($n))
-            ->map(fn (string $n) => $this->findOrCreateSkill($n)->id)
+            ->map(fn (string $n) => Skill::findOrCreateByName($n)->id)
             ->values();
 
         DB::transaction(function () use ($student, $ids) {
@@ -68,12 +68,5 @@ class ProfileService
         }
 
         return $path;
-    }
-
-    /** So tên không phân biệt hoa thường: "php" dùng lại kỹ năng "PHP" đã có. */
-    private function findOrCreateSkill(string $name): Skill
-    {
-        return Skill::whereRaw('LOWER(name) = ?', [Str::lower($name)])->first()
-            ?? Skill::create(['name' => $name, 'aliases' => []]);
     }
 }
