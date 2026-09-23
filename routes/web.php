@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\ApplicationController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\RegisterController;
 use Illuminate\Support\Facades\Route;
@@ -24,6 +25,15 @@ Route::middleware('student.or.guest')->group(function () {
     Route::view('/explore', 'explore')->name('explore');
     Route::view('/jobs', 'jobs')->name('jobs');
     Route::view('/companies', 'companies')->name('companies');
+});
+
+/*
+| API cho JavaScript trang sinh viên. Nằm trong nhóm web để dùng chung session + CSRF (header X-CSRF-TOKEN).
+| Chưa đăng nhập → 401 JSON, JS sẽ mở popup đăng nhập.
+*/
+Route::prefix('api')->name('api.')->middleware(['auth', 'role:student', 'throttle:120,1'])->group(function () {
+    Route::post('/jobs/{job}/apply', [ApplicationController::class, 'store'])->name('jobs.apply');
+    Route::delete('/applications/{application}', [ApplicationController::class, 'destroy'])->name('applications.destroy');
 });
 
 Route::middleware(['auth', 'role:student'])->group(function () {
