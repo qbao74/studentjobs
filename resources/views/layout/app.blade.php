@@ -40,6 +40,9 @@ has-rail
         @endif
     </div>
     <nav class="bottom-nav" id="bottom-nav"></nav>
+    <script>
+        window.JOBLY = @json($jobly);
+    </script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="{{ asset('jobly/js/data.js') }}"></script>
     <script src="{{ asset('jobly/js/swipe.js') }}"></script>

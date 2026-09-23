@@ -41,6 +41,44 @@ enum ApplicationStatus: string
         return in_array($this, [self::Hired, self::Rejected], true);
     }
 
+    /**
+     * Các bước cho trang tiến trình. status: done | current | upcoming | rejected.
+     *
+     * @return list<array{key: string, label: string, status: string}>
+     */
+    public function timeline(): array
+    {
+        $steps = [
+            'applied' => 'Đã ứng tuyển',
+            'viewed' => 'Nhà tuyển dụng đã xem',
+            'shortlist' => 'Vào vòng trong',
+            'interview' => 'Phỏng vấn',
+            'result' => match ($this) {
+                self::Hired => 'Trúng tuyển',
+                self::Rejected => 'Chưa phù hợp',
+                default => 'Kết quả',
+            },
+        ];
+
+        $current = $this->step();
+        $result = [];
+        $i = 1;
+
+        foreach ($steps as $key => $label) {
+            $status = match (true) {
+                $i < $current => 'done',
+                $i > $current => 'upcoming',
+                $this === self::Hired => 'done',
+                $this === self::Rejected => 'rejected',
+                default => 'current',
+            };
+            $result[] = ['key' => $key, 'label' => $label, 'status' => $status];
+            $i++;
+        }
+
+        return $result;
+    }
+
     /** @return list<string> */
     public static function values(): array
     {

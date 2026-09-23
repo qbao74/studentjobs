@@ -19,10 +19,12 @@ Route::post('/logout', [LoginController::class, 'destroy'])
     ->middleware('auth')
     ->name('logout');
 
-Route::view('/', 'home')->name('home');
-Route::view('/explore', 'explore')->name('explore');
-Route::view('/jobs', 'jobs')->name('jobs');
-Route::view('/companies', 'companies')->name('companies');
+Route::middleware('student.or.guest')->group(function () {
+    Route::view('/', 'home')->name('home');
+    Route::view('/explore', 'explore')->name('explore');
+    Route::view('/jobs', 'jobs')->name('jobs');
+    Route::view('/companies', 'companies')->name('companies');
+});
 
 Route::middleware(['auth', 'role:student'])->group(function () {
     Route::view('/match', 'match')->name('match');
