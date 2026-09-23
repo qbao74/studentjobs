@@ -269,4 +269,162 @@ Sinh viên ứng tuyển → có `applications` → hai bên nhắn tin qua `mes
 Cần kiểm tra:
 - `down()` xóa `messages` trước vì nó phụ thuộc `applications`.
 
+---
+
+# PHASE 02 — Enum, model, quan hệ, factory, seeder
+
+## Commit: fed8185
+
+### Tiêu đề
+feat: Thêm enum vai trò, trạng thái tin và trạng thái đơn ứng tuyển
+
+### Ngày
+2026-09-23
+
+### Mục đích
+Thay các chuỗi `'student'`, `'open'`, `'interview'` rải rác trong code bằng một chỗ định nghĩa duy nhất, gõ sai là PHP báo lỗi ngay.
+
+### Đã làm
+- `Role`: `label()` (tên tiếng Việt), `homePath()` (trang đầu sau đăng nhập).
+- `JobStatus`: `open`, `closed`, `hidden`.
+- `ApplicationStatus`: 6 trạng thái, `label()`, `step()` (vị trí trên thanh tiến trình), `isFinal()`.
+
+### Luồng code
+Database lưu chuỗi → model cast sang enum → code so sánh `$job->status === JobStatus::Open`.
+
+### File quan trọng
+- `app/Enums/Role.php`, `app/Enums/JobStatus.php`, `app/Enums/ApplicationStatus.php`
+
+### Kiến thức cần nhớ
+- *Backed enum* (`enum X: string`) có `->value` để lưu database và `X::from('...')` để đọc lại.
+- `match` bắt buộc liệt kê đủ trường hợp. Thiếu một case là PHP ném `UnhandledMatchError`.
+
+### Nếu muốn sửa chức năng này
+Cần kiểm tra:
+- Thêm trạng thái mới: thêm `case`, rồi bổ sung mọi `match` trong enum đó.
+
+## Commit: f81dc6c
+
+### Tiêu đề
+feat: Khai báo model và quan hệ cho toàn bộ bảng dữ liệu
+
+### Ngày
+2026-09-23
+
+### Mục đích
+Để code viết `$student->applications` thay vì tự viết câu SQL nối bảng.
+
+### Đã làm
+- Model mới: `Employer`, `Application`, `Cv`, `Message`, `JobRecommendation`.
+- `User` → `student()`, `employer()`. `Student` → `skills()` (pivot `source`), `cv()`, `applications()`, `recommendations()`, `savedJobs()`, `followedCompanies()`.
+- `JobPost` → `skills()` (pivot `is_required`), `applications()`, scope `open()`, cast `status` sang `JobStatus`.
+- `#[Fillable]` liệt kê cột được gán hàng loạt. `Cv` ẩn `path` và `extracted_text` khi chuyển sang JSON.
+
+### Luồng code
+`Student::with('skills')->first()` → Eloquent chạy 2 câu SQL (students, rồi student_skill + skills) → gắn kết quả vào `$student->skills`.
+
+### File quan trọng
+- `app/Models/*.php`
+
+### Kiến thức cần nhớ
+- `belongsTo` đặt ở bảng có khóa ngoại. `hasMany` / `hasOne` đặt ở bảng bị trỏ tới.
+- `belongsToMany` dùng cho bảng trung gian. `withPivot` để đọc thêm cột trong bảng đó.
+- `Fillable` chống *mass assignment*: `company_id` của tin, `verified` của công ty không nằm trong danh sách, nên người dùng không tự gửi lên để đổi được.
+- `#[Scope]` biến `open()` thành `JobPost::open()`.
+
+### Nếu muốn sửa chức năng này
+Cần kiểm tra:
+- Cột mới muốn gán bằng `create()`/`update()` phải thêm vào `#[Fillable]`.
+
+## Commit: 0d6053c
+
+### Tiêu đề
+feat: Thêm factory cho người dùng, sinh viên, công ty, tin tuyển và đơn
+
+### Ngày
+2026-09-23
+
+### Mục đích
+Test cần tạo dữ liệu nhanh: `Application::factory()->create()` tự tạo sinh viên, user, tin, công ty đi kèm.
+
+### Đã làm
+- `UserFactory` thêm `role` (trước đó thiếu nên factory lỗi vì cột `role` bắt buộc), trạng thái `employer()`, `admin()`, `inactive()`.
+- Factory cho `Student`, `Company` (`verified()`), `Employer`, `JobPost` (`closed()`, `hidden()`), `Skill`, `Application`.
+
+### Luồng code
+`'student_id' => Student::factory()` → factory tạo `Student` trước, lấy id gắn vào đơn.
+
+### File quan trọng
+- `database/factories/*.php`
+
+### Kiến thức cần nhớ
+- *State* (`->employer()`) chỉ ghi đè vài cột của `definition()`.
+- Factory chạy ở chế độ *unguarded*, nên gán được cả cột ngoài `Fillable`.
+
+### Nếu muốn sửa chức năng này
+Cần kiểm tra:
+- Thêm cột bắt buộc (NOT NULL, không default) vào bảng thì phải thêm vào factory.
+
+## Commit: 0caac6b
+
+### Tiêu đề
+fix: Khớp số bước tiến trình đơn với giao diện năm bước
+
+### Ngày
+2026-09-23
+
+### Mục đích
+Trang "Tiến trình" có 5 bước, còn `ApplicationStatus::step()` chỉ trả 1–4.
+
+### Đã làm
+- `step()`: Pending 1, Viewed 2, Shortlisted 3, Interview 4, Hired/Rejected 5.
+
+### Luồng code
+`step()` → frontend tô các bước `< step` là xong, bước `= step` là hiện tại.
+
+### File quan trọng
+- `app/Enums/ApplicationStatus.php`
+
+### Kiến thức cần nhớ
+Bug xuất hiện ở: `ApplicationStatus::step()`.
+Nguyên nhân: viết enum theo trí nhớ, không đối chiếu `APPLICATIONS` trong `data.js` (5 bước).
+Cách sửa: đếm lại bước trên giao diện rồi map lại.
+Commit sửa: `0caac6b`.
+
+### Nếu muốn sửa chức năng này
+Cần kiểm tra:
+- Timeline trong `public/jobly/js/app.js` (trang tiến trình).
+
+## Commit: d611042
+
+### Tiêu đề
+feat: Seed đủ ba vai trò kèm đơn ứng tuyển và tin nhắn mẫu
+
+### Ngày
+2026-09-23
+
+### Mục đích
+Sau `migrate:fresh --seed` là đăng nhập thử được cả ba vai trò và có dữ liệu để xem.
+
+### Đã làm
+- Tài khoản (mật khẩu `password`): `lebao@student.edu.vn`, `minhanh@student.edu.vn`, `quochuy@student.edu.vn`, `admin@jobly.vn`, `hr@<slug>.vn` cho 8 công ty (ví dụ `hr@techwind.vn`).
+- Tin 3 và 8 là remote. Kỹ năng cuối của mỗi tin là điểm cộng (`is_required = false`).
+- Kỹ năng có `aliases`, ví dụ `JavaScript` → `js`, `es6`.
+- 7 đơn, 6 tin nhắn, tin cuối của HR để chưa đọc.
+- Mật khẩu băm một lần rồi dùng lại (seed từ 4,7 giây còn khoảng 0,9 giây).
+
+### Luồng code
+`DatabaseSeeder::run()` → `JobPlatformSeeder::run()` → công ty → Lê Bảo → tin + kỹ năng → admin → HR → sinh viên khác → đơn + tin nhắn.
+
+### File quan trọng
+- `database/seeders/JobPlatformSeeder.php`
+
+### Kiến thức cần nhớ
+- Thứ tự seed phải theo khóa ngoại: có công ty rồi mới có tin; có đơn rồi mới có tin nhắn.
+- bcrypt chậm có chủ đích để chống dò mật khẩu, nên seeder không băm lại nhiều lần.
+
+### Nếu muốn sửa chức năng này
+Cần kiểm tra:
+- Thêm kỹ năng mới: thêm vào `skills` của tin, và vào `ALIASES` nếu muốn nhận diện trong CV.
+
 <!-- mục-tiếp-theo -->
