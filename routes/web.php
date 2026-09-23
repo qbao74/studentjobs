@@ -2,9 +2,11 @@
 
 use App\Http\Controllers\Api\ApplicationController;
 use App\Http\Controllers\Api\BookmarkController;
+use App\Http\Controllers\Api\CvController;
 use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\RegisterController;
+use App\Http\Controllers\CvDownloadController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('guest')->group(function () {
@@ -43,7 +45,11 @@ Route::prefix('api')->name('api.')->middleware(['auth', 'role:student', 'throttl
     Route::put('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::put('/profile/skills', [ProfileController::class, 'skills'])->name('profile.skills');
     Route::post('/profile/avatar', [ProfileController::class, 'avatar'])->name('profile.avatar');
+    Route::post('/profile/cv', [CvController::class, 'store'])->middleware('throttle:10,1')->name('profile.cv.store');
+    Route::delete('/profile/cv', [CvController::class, 'destroy'])->name('profile.cv.destroy');
 });
+
+Route::get('/cvs/{cv}/download', CvDownloadController::class)->middleware('auth')->name('cvs.download');
 
 Route::middleware(['auth', 'role:student'])->group(function () {
     Route::view('/match', 'match')->name('match');

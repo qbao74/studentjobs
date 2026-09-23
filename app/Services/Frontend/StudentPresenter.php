@@ -123,6 +123,7 @@ class StudentPresenter
                 'error' => $cv->parse_error,
                 'size' => $cv->size,
                 'foundSkills' => array_column($cv->parsed['skills'] ?? [], 'name'),
+                'downloadUrl' => route('cvs.download', $cv),
             ] : null,
             'profileScore' => $student->profile_score,
             'profileMissing' => $profileMissing,

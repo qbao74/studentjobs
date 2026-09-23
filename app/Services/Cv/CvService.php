@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use RuntimeException;
+use Symfony\Component\HttpKernel\Exception\UnprocessableEntityHttpException;
 use ZipArchive;
 
 /**
@@ -29,6 +30,11 @@ class CvService
     public function upload(Student $student, UploadedFile $file): Cv
     {
         $mime = $this->detectType($file);
+
+        if (! in_array($mime, [CvTextExtractor::PDF, CvTextExtractor::DOCX], true)) {
+            throw new UnprocessableEntityHttpException('File không phải PDF hoặc DOCX hợp lệ.');
+        }
+
         $extension = $mime === CvTextExtractor::PDF ? 'pdf' : 'docx';
 
         // Tên file do server sinh ngẫu nhiên, không dùng tên người dùng gửi lên (tránh ../ và ghi đè).
