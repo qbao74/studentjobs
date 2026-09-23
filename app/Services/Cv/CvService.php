@@ -5,6 +5,7 @@ namespace App\Services\Cv;
 use App\Models\Cv;
 use App\Models\Skill;
 use App\Models\Student;
+use App\Services\Ai\AiProfileReader;
 use App\Services\Profile\ProfileRefresher;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -25,6 +26,7 @@ class CvService
         private CvTextExtractor $extractor,
         private CvParser $parser,
         private ProfileRefresher $refresher,
+        private AiProfileReader $reader,
     ) {}
 
     public function upload(Student $student, UploadedFile $file): Cv
@@ -139,9 +141,50 @@ class CvService
         $catalog = Skill::query()->get(['id', 'name', 'aliases'])
             ->map(fn (Skill $s) => ['id' => $s->id, 'name' => $s->name, 'aliases' => $s->aliases ?? []]);
 
+        if (filled(config('ai.key'))) {
+            return $this->analyzeWithAi($text, $catalog);
+        }
+
         return [
             'extracted_text' => mb_substr($text, 0, 60000),
             'parsed' => $this->parser->parse($text, $catalog),
+            'parse_status' => 'parsed',
+            'parse_error' => null,
+        ];
+    }
+
+    /**
+     * AI đọc kỹ năng, mức độ và lĩnh vực. Email, số điện thoại và từ khóa vẫn lấy bằng luật vì đó là mẫu cố định.
+     *
+     * @param  iterable<array{id: int, name: string, aliases?: list<string>|null}>  $catalog
+     * @return array{extracted_text: ?string, parsed: ?array, parse_status: string, parse_error: ?string}
+     */
+    private function analyzeWithAi(string $text, iterable $catalog): array
+    {
+        try {
+            $document = $this->reader->read($text, 'cv');
+        } catch (RuntimeException $e) {
+            return [
+                'extracted_text' => mb_substr($text, 0, 60000),
+                'parsed' => null,
+                'parse_status' => 'failed',
+                'parse_error' => $e->getMessage(),
+            ];
+        }
+
+        $contact = $this->parser->parse($text, $catalog);
+
+        return [
+            'extracted_text' => mb_substr($text, 0, 60000),
+            'parsed' => [
+                ...$document->toArray(),
+                'email' => $contact['email'],
+                'phone' => $contact['phone'],
+                'education' => $contact['education'],
+                'keywords' => $contact['keywords'],
+                'word_count' => $contact['word_count'],
+                'reader' => 'ai',
+            ],
             'parse_status' => 'parsed',
             'parse_error' => null,
         ];

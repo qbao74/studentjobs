@@ -6,8 +6,10 @@ use App\Enums\JobStatus;
 use App\Models\Company;
 use App\Models\JobPost;
 use App\Models\Skill;
+use App\Services\Ai\AiProfileReader;
 use App\Services\Matching\RecommendationService;
 use Illuminate\Support\Facades\DB;
+use RuntimeException;
 use Symfony\Component\HttpKernel\Exception\UnprocessableEntityHttpException;
 
 /**
@@ -16,7 +18,10 @@ use Symfony\Component\HttpKernel\Exception\UnprocessableEntityHttpException;
  */
 class JobPostService
 {
-    public function __construct(private RecommendationService $recommendations) {}
+    public function __construct(
+        private RecommendationService $recommendations,
+        private AiProfileReader $reader,
+    ) {}
 
     /**
      * @param  array{fields: array<string, mixed>, skills: array<string, bool>}  $data  skills: tên => bắt buộc?
@@ -30,7 +35,8 @@ class JobPostService
             return $job;
         });
 
-        $this->recommendations->refreshForJob($job);
+        $this->readWithAi($job);
+        $this->recommendations->refreshForJob($job->refresh());
 
         return $job;
     }
@@ -45,6 +51,7 @@ class JobPostService
             $this->syncSkills($job, $data['skills']);
         });
 
+        $this->readWithAi($job);
         $this->recommendations->refreshForJob($job->refresh());
 
         return $job;
@@ -82,5 +89,50 @@ class JobPostService
         }
 
         $job->skills()->sync($pivot);
+    }
+
+    /** AI bổ sung kỹ năng đọc từ mô tả. Kỹ năng nhà tuyển dụng đã gắn thì giữ nguyên mức bắt buộc. */
+    private function readWithAi(JobPost $job): void
+    {
+        if (! filled(config('ai.key'))) {
+            return;
+        }
+
+        $text = implode("\n", array_filter([
+            $job->title,
+            $job->description,
+            implode("\n", $job->requirements ?? []),
+        ]));
+
+        if (mb_strlen(trim($text)) < 20) {
+            return;
+        }
+
+        try {
+            $document = $this->reader->read($text, 'job');
+        } catch (RuntimeException $e) {
+            report($e);
+
+            return;
+        }
+
+        $job->update(['analyzed' => $document->toArray()]);
+
+        $attached = $job->skills()->pluck('skills.id');
+        $extra = [];
+
+        foreach ($document->skills as $skill) {
+            if ($attached->contains($skill['id'])) {
+                continue;
+            }
+
+            $extra[$skill['id']] = ['is_required' => $skill['importance'] === 'required'];
+        }
+
+        if ($extra !== []) {
+            $job->skills()->attach($extra);
+        }
+
+        $job->unsetRelation('skills');
     }
 }

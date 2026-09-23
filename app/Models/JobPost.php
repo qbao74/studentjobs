@@ -13,7 +13,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['title', 'salary', 'location', 'is_remote', 'type', 'hours', 'image', 'description', 'requirements', 'benefits', 'status'])]
+#[Fillable(['title', 'salary', 'location', 'is_remote', 'type', 'hours', 'image', 'description', 'requirements', 'benefits', 'analyzed', 'status'])]
 class JobPost extends Model
 {
     /** @use HasFactory<JobPostFactory> */
@@ -56,6 +56,7 @@ class JobPost extends Model
         return [
             'requirements' => 'array',
             'benefits' => 'array',
+            'analyzed' => 'array',
             'is_remote' => 'boolean',
             'status' => JobStatus::class,
         ];

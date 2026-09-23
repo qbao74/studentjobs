@@ -33,13 +33,21 @@ class FeatureExtractor
             implode("\n", $job->requirements ?? []),
         ]));
 
+        $analyzed = is_array($job->analyzed) ? $job->analyzed : [];
+        $fields = $this->detectFields($job->title.' '.$job->description);
+        $aiField = $this->knownCode($analyzed['field'] ?? null, 'matching.fields');
+
+        if ($aiField !== null) {
+            $fields = array_values(array_unique([...$fields, $aiField]));
+        }
+
         return new JobRequirements(
             jobId: $job->id,
             requiredSkills: $required,
             optionalSkills: $optional,
             keywords: TextNormalizer::keywords($text),
-            fields: $this->detectFields($job->title.' '.$job->description),
-            city: $this->detectCity((string) $job->location),
+            fields: $fields,
+            city: $this->detectCity((string) $job->location) ?? $this->knownCode($analyzed['city'] ?? null, 'matching.cities'),
             isRemote: (bool) $job->is_remote,
         );
     }
@@ -48,9 +56,15 @@ class FeatureExtractor
     {
         $student->loadMissing(['skills', 'cv']);
 
-        $cvKeywords = $student->cv?->parse_status === 'parsed'
-            ? ($student->cv->parsed['keywords'] ?? [])
+        $parsed = $student->cv?->parse_status === 'parsed' && is_array($student->cv->parsed)
+            ? $student->cv->parsed
             : [];
+        $fields = $this->detectFields((string) $student->major);
+        $aiField = $this->knownCode($parsed['field'] ?? null, 'matching.fields');
+
+        if ($aiField !== null) {
+            $fields = array_values(array_unique([...$fields, $aiField]));
+        }
 
         return new StudentFeatures(
             studentId: $student->id,
@@ -58,10 +72,10 @@ class FeatureExtractor
             keywords: array_values(array_unique(array_merge(
                 TextNormalizer::keywords((string) $student->bio),
                 TextNormalizer::keywords((string) $student->major),
-                $cvKeywords,
+                $parsed['keywords'] ?? [],
             ))),
-            fields: $this->detectFields((string) $student->major),
-            city: $this->detectCity((string) $student->location),
+            fields: $fields,
+            city: $this->detectCity((string) $student->location) ?? $this->knownCode($parsed['city'] ?? null, 'matching.cities'),
             hasCv: $student->cv?->parse_status === 'parsed',
         );
     }
@@ -97,5 +111,14 @@ class FeatureExtractor
         }
 
         return null;
+    }
+
+    private function knownCode(mixed $code, string $configKey): ?string
+    {
+        if (! is_string($code) || ! array_key_exists($code, config($configKey))) {
+            return null;
+        }
+
+        return $code;
     }
 }
