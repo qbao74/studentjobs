@@ -5,7 +5,7 @@ namespace App\Services\Cv;
 use App\Models\Cv;
 use App\Models\Skill;
 use App\Models\Student;
-use App\Services\Profile\ProfileScoreCalculator;
+use App\Services\Profile\ProfileRefresher;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -14,7 +14,7 @@ use RuntimeException;
 use ZipArchive;
 
 /**
- * Điều phối xử lý CV: lưu file → trích chữ → phân tích → cập nhật kỹ năng → chấm lại độ đầy đủ hồ sơ.
+ * Điều phối xử lý CV: lưu file → trích chữ → phân tích → cập nhật kỹ năng → chấm lại hồ sơ và điểm khớp.
  */
 class CvService
 {
@@ -23,7 +23,7 @@ class CvService
     public function __construct(
         private CvTextExtractor $extractor,
         private CvParser $parser,
-        private ProfileScoreCalculator $profileScore,
+        private ProfileRefresher $refresher,
     ) {}
 
     public function upload(Student $student, UploadedFile $file): Cv
@@ -60,7 +60,7 @@ class CvService
             Storage::disk(self::DISK)->delete($oldPath);
         }
 
-        $this->profileScore->refresh($student->fresh());
+        $this->refresher->refresh($student);
 
         return $cv;
     }
@@ -79,7 +79,7 @@ class CvService
         });
 
         Storage::disk(self::DISK)->delete($cv->path);
-        $this->profileScore->refresh($student->fresh());
+        $this->refresher->refresh($student);
     }
 
     /**

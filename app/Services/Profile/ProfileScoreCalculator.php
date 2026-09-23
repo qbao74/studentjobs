@@ -61,4 +61,9 @@ class ProfileScoreCalculator
 
         return $score;
     }
+
+    public function refreshAll(): void
+    {
+        Student::with(['skills', 'cv'])->each(fn (Student $student) => $this->refresh($student));
+    }
 }
