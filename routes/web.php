@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\ApplicationController;
+use App\Http\Controllers\Api\BookmarkController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\RegisterController;
 use Illuminate\Support\Facades\Route;
@@ -34,6 +35,9 @@ Route::middleware('student.or.guest')->group(function () {
 Route::prefix('api')->name('api.')->middleware(['auth', 'role:student', 'throttle:120,1'])->group(function () {
     Route::post('/jobs/{job}/apply', [ApplicationController::class, 'store'])->name('jobs.apply');
     Route::delete('/applications/{application}', [ApplicationController::class, 'destroy'])->name('applications.destroy');
+
+    Route::post('/jobs/{job}/save', [BookmarkController::class, 'toggleJob'])->name('jobs.save');
+    Route::post('/companies/{company:slug}/follow', [BookmarkController::class, 'toggleCompany'])->name('companies.follow');
 });
 
 Route::middleware(['auth', 'role:student'])->group(function () {
