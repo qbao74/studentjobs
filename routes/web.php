@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\ApplicationController;
 use App\Http\Controllers\Api\BookmarkController;
+use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\RegisterController;
 use Illuminate\Support\Facades\Route;
@@ -38,6 +39,10 @@ Route::prefix('api')->name('api.')->middleware(['auth', 'role:student', 'throttl
 
     Route::post('/jobs/{job}/save', [BookmarkController::class, 'toggleJob'])->name('jobs.save');
     Route::post('/companies/{company:slug}/follow', [BookmarkController::class, 'toggleCompany'])->name('companies.follow');
+
+    Route::put('/profile', [ProfileController::class, 'update'])->name('profile.update');
+    Route::put('/profile/skills', [ProfileController::class, 'skills'])->name('profile.skills');
+    Route::post('/profile/avatar', [ProfileController::class, 'avatar'])->name('profile.avatar');
 });
 
 Route::middleware(['auth', 'role:student'])->group(function () {
