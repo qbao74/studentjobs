@@ -378,7 +378,7 @@ class JobPlatformSeeder extends Seeder
         $damBaoKyNang = function (string $name) use (&$skillIds, $now): int {
             if (! isset($skillIds[$name])) {
                 $skillIds[$name] = DB::table('skills')->insertGetId([
-                    'ten_skill' => $name,
+                    'name' => $name,
                     'created_at' => $now,
                     'updated_at' => $now,
                 ]);
