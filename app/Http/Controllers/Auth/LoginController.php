@@ -20,7 +20,14 @@ class LoginController extends Controller
 
         $request->session()->regenerate();
 
-        return redirect()->intended($request->user()->role->homePath());
+        $home = $request->user()->role->homePath();
+
+        // Popup đăng nhập gửi JSON: trả về vai trò để JS tự quyết định tải lại hay chuyển trang.
+        if ($request->expectsJson()) {
+            return response()->json(['role' => $request->user()->role->value, 'redirect' => url($home)]);
+        }
+
+        return redirect()->intended($home);
     }
 
     public function destroy(Request $request)

@@ -86,4 +86,20 @@ class LoginTest extends TestCase
 
         $this->assertGuest();
     }
+
+    public function test_popup_login_gets_json_instead_of_redirect(): void
+    {
+        $student = Student::factory()->create();
+
+        $this->postJson(route('login'), ['email' => $student->user->email, 'password' => 'password'])
+            ->assertOk()
+            ->assertJson(['role' => 'student', 'redirect' => url('/')]);
+    }
+
+    public function test_popup_login_errors_are_json(): void
+    {
+        $this->postJson(route('login'), ['email' => 'x@y.vn', 'password' => 'sai'])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('email');
+    }
 }

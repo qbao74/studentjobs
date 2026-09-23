@@ -44,6 +44,7 @@ has-rail
         window.JOBLY = @json($jobly);
     </script>
     <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="{{ asset('jobly/js/auth.js') }}"></script>
     <script src="{{ asset('jobly/js/data.js') }}"></script>
     <script src="{{ asset('jobly/js/swipe.js') }}"></script>
     <script src="{{ asset('jobly/js/app.js') }}"></script>

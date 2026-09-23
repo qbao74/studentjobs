@@ -28,6 +28,10 @@ class RegisterController extends Controller
         Auth::login($user);
         $request->session()->regenerate();
 
+        if ($request->expectsJson()) {
+            return response()->json(['role' => $user->role->value, 'redirect' => url($user->role->homePath())], 201);
+        }
+
         return redirect($user->role->homePath());
     }
 }

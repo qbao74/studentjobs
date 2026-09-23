@@ -83,4 +83,13 @@ class RegisterTest extends TestCase
             'name' => 'A', 'email' => 'a@b.vn', 'password' => 'abcdefgh', 'password_confirmation' => 'abcdefgh',
         ])->assertSessionHasErrors(['email', 'password']);
     }
+
+    public function test_popup_registration_returns_json(): void
+    {
+        $this->postJson(route('register.store'), [
+            'name' => 'Khách Mới', 'email' => 'moi@x.vn', 'password' => 'matkhau123', 'password_confirmation' => 'matkhau123',
+        ])->assertCreated()->assertJson(['role' => 'student']);
+
+        $this->assertAuthenticated();
+    }
 }

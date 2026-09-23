@@ -3997,3 +3997,108 @@ body[data-page="chat"] .chat-layout {
 .chat-back {
   display: none;
 }
+
+/* ------------------------------------------------------------
+   21 AUTH POPUP — đăng nhập / đăng ký ngay trên trang (auth.js)
+   ------------------------------------------------------------ */
+.auth-modal {
+  width: min(100%, 420px);
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+}
+
+.auth-modal h2 {
+  font-size: 1.3rem;
+  margin-bottom: 4px;
+}
+
+.auth-switch {
+  display: flex;
+  gap: 6px;
+  margin: 16px 0 6px;
+  padding: 4px;
+  border-radius: 14px;
+  background: var(--surface-2);
+}
+
+.auth-switch button {
+  flex: 1;
+  padding: 9px;
+  border-radius: 10px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.auth-switch button.is-active {
+  background: #fff;
+  color: var(--text);
+  box-shadow: 0 2px 8px rgba(20, 26, 51, 0.08);
+}
+
+.auth-pane label,
+.form-field {
+  display: block;
+  margin-top: 12px;
+  font-size: 0.86rem;
+  font-weight: 600;
+}
+
+.auth-pane input:not([type="checkbox"]),
+.form-field input,
+.form-field textarea,
+.form-field select {
+  width: 100%;
+  margin-top: 6px;
+  padding: 11px 12px;
+  border: 1px solid var(--border-strong, rgba(20, 26, 51, 0.12));
+  border-radius: 12px;
+  font: inherit;
+  font-weight: 400;
+  background: #fff;
+}
+
+.auth-pane input:focus,
+.form-field input:focus,
+.form-field textarea:focus,
+.form-field select:focus {
+  outline: 2px solid var(--primary);
+  outline-offset: 1px;
+}
+
+.auth-check {
+  display: flex !important;
+  align-items: center;
+  gap: 8px;
+  font-weight: 500 !important;
+}
+
+.auth-err,
+.form-error {
+  min-height: 1.2em;
+  margin-top: 10px;
+  color: var(--danger);
+  font-size: 0.84rem;
+}
+
+.auth-pane .btn {
+  width: 100%;
+  margin-top: 6px;
+}
+
+.auth-foot {
+  margin-top: 14px;
+  text-align: center;
+  font-size: 0.84rem;
+  color: var(--muted);
+}
+
+.auth-foot a {
+  color: var(--primary);
+  font-weight: 700;
+}
+
+.btn.is-loading,
+button.is-loading {
+  opacity: 0.6;
+  pointer-events: none;
+}
