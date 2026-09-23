@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\ApplicationController;
 use App\Http\Controllers\Api\BookmarkController;
 use App\Http\Controllers\Api\CvController;
+use App\Http\Controllers\Api\MessageController;
 use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\RegisterController;
@@ -47,6 +48,12 @@ Route::prefix('api')->name('api.')->middleware(['auth', 'role:student', 'throttl
     Route::post('/profile/avatar', [ProfileController::class, 'avatar'])->name('profile.avatar');
     Route::post('/profile/cv', [CvController::class, 'store'])->middleware('throttle:10,1')->name('profile.cv.store');
     Route::delete('/profile/cv', [CvController::class, 'destroy'])->name('profile.cv.destroy');
+});
+
+// Tin nhắn dùng chung cho sinh viên và nhà tuyển dụng; quyền kiểm tra bằng ApplicationPolicy::message.
+Route::prefix('api')->name('api.')->middleware(['auth', 'throttle:120,1'])->group(function () {
+    Route::get('/applications/{application}/messages', [MessageController::class, 'index'])->name('messages.index');
+    Route::post('/applications/{application}/messages', [MessageController::class, 'store'])->middleware('throttle:30,1')->name('messages.store');
 });
 
 Route::get('/cvs/{cv}/download', CvDownloadController::class)->middleware('auth')->name('cvs.download');
