@@ -4184,6 +4184,35 @@ button.is-loading {
   margin: 0;
 }
 
+/* Chat thật: trạng thái tải, tin đang gửi / gửi lỗi */
+.thread-state {
+  margin: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 30px 16px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.bubble.is-pending {
+  opacity: 0.6;
+}
+
+.bubble.is-failed {
+  outline: 2px solid var(--danger);
+}
+
+.conv-item small {
+  display: block;
+  font-size: 0.72rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* Trang hồ sơ: đổi ảnh, kỹ năng, CV, form sửa */
 .avatar-edit {
   position: relative;

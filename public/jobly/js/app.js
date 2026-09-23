@@ -1101,85 +1101,142 @@ function khoiTrangKhop() {
 }
 
 /* ---------- CHAT ----------
-   3 cột: danh sách hội thoại | thread | panel info.
-   messagesById giữ tin trong RAM (mất khi reload). Recruiter reply giả sau 1.1s.
-   Màu chủ đề lưu localStorage theo conv id.
+   3 cột: danh sách hội thoại | luồng tin | thông tin. Mỗi đơn ứng tuyển = 1 hội thoại (conv.id = id đơn).
+   Tin nhắn lấy từ GET /api/applications/{id}/messages; mỗi 5 giây hỏi lại với ?after=<id tin cuối>
+   để chỉ nhận tin mới. Gửi: POST cùng địa chỉ, hiện bong bóng "Đang gửi" trước rồi thay bằng tin thật.
+   Màu hội thoại là tuỳ chọn hiển thị nên lưu localStorage.
    ---------- */
+const CHAT_HOI_LAI_MS = 5000;
+
+/** "2026-09-23" → "Hôm nay" / "Hôm qua" / "23/09/2026". */
+function nhanNgay(isoDate) {
+  const d = new Date(`${isoDate}T00:00:00`);
+  const homNay = new Date();
+  homNay.setHours(0, 0, 0, 0);
+  const lech = Math.round((homNay - d) / 86400000);
+  if (lech === 0) return "Hôm nay";
+  if (lech === 1) return "Hôm qua";
+  return ngayVn(isoDate);
+}
+
 /** Khởi tạo trang Chat 3 cột. */
 function khoiTrangChat() {
   const layout = chon("#chat-layout");
   if (!layout) return;
-  const convItems = chon("#conv-items");
-  const thread = chon("#chat-thread");
   if (!CONVERSATIONS.length) {
-    layout.innerHTML = `<div class="card empty-deck" style="margin:40px auto"><div class="emoji">💬</div><h2>Chưa có hội thoại</h2><p>Mỗi đơn ứng tuyển là một hội thoại với nhà tuyển dụng.</p><a class="btn btn-primary" href="/">Tìm việc</a></div>`;
+    layout.innerHTML = `
+      <div class="card empty-deck" style="margin:40px auto">
+        <div class="emoji">💬</div>
+        <h2>Chưa có hội thoại</h2>
+        <p>Mỗi đơn ứng tuyển là một hội thoại với nhà tuyển dụng. Ứng tuyển một việc để bắt đầu.</p>
+        <a class="btn btn-primary" href="/">Tìm việc</a>
+      </div>`;
     return;
   }
-  CONVERSATIONS.forEach((c) => (c.id = String(c.id)));
-  let activeId = CONVERSATIONS.some((c) => c.id === thamSoUrl("c")) ? thamSoUrl("c") : CONVERSATIONS[0].id;
-  const messagesById = {};
 
-  const dungTinNhan = (conv) => {
-    const job = layViecTheoId(conv.jobId);
-    return [
-      { id: 1, from: "recruiter", text: `Chào Bảo! Cảm ơn bạn đã ứng tuyển vị trí ${job.title}.`, time: "10:02" },
-      { id: 2, from: "user", text: "Dạ vâng, em rất mong được trao đổi thêm với team.", time: "10:10" },
-      { id: 3, from: "recruiter", text: conv.last, time: "10:12" },
-    ];
-  };
+  const convItems = chon("#conv-items");
+  const thread = chon("#chat-thread");
+  const input = chon("#chat-input");
+  const layHoiThoai = (id) => CONVERSATIONS.find((c) => c.id === Number(id));
+  const moSanHoiThoai = Boolean(layHoiThoai(thamSoUrl("c")));
+  let activeId = layHoiThoai(thamSoUrl("c"))?.id ?? CONVERSATIONS[0].id;
+  const messagesById = {};
+  let hoiLai = null;
 
   const veDanhSachHoiThoai = () => {
     convItems.innerHTML = CONVERSATIONS.map((conv) => {
       const c = layCongTy(conv.companyId);
+      const job = layViecTheoId(conv.jobId);
       return `
         <button class="conv-item ${conv.id === activeId ? "is-active" : ""}" type="button" data-conv="${conv.id}">
           ${htmlLogo(c)}
-          <div><strong>${thoatHtml(c.name)}</strong><p>${thoatHtml(conv.last)}</p></div>
-          <div class="conv-meta"><span>${conv.time}</span>${conv.unread ? `<span class="unread">${conv.unread}</span>` : ""}</div>
+          <div><strong>${thoatHtml(c.name)}</strong><p>${thoatHtml(conv.last)}</p><small class="muted">${thoatHtml(job?.title || "")}</small></div>
+          <div class="conv-meta"><span>${thoatHtml(conv.time)}</span>${conv.unread ? `<span class="unread">${conv.unread}</span>` : ""}</div>
         </button>`;
     }).join("");
-    chonHet(".conv-item", convItems).forEach((el) => {
-      const conv = CONVERSATIONS.find((c) => c.id === el.dataset.conv);
-      if (conv?.online) chon(".company-logo", el).insertAdjacentHTML("beforeend", '<span class="online-dot"></span>');
-    });
     veIcon();
   };
 
   const veLuongTin = () => {
-    const msgs = messagesById[activeId];
-    const conv = CONVERSATIONS.find((c) => c.id === activeId);
+    const conv = layHoiThoai(activeId);
     const job = layViecTheoId(conv.jobId);
     const c = layCongTy(conv.companyId);
-    // Gom tin nhắn liên tiếp cùng người gửi thành 1 nhóm (kiểu Messenger)
-    const groups = [];
-    msgs.forEach((m) => {
-      const last = groups[groups.length - 1];
-      if (last && last.from === m.from) last.items.push(m);
-      else groups.push({ from: m.from, items: [m] });
-    });
-    const htmlNhomTin = (g) => {
-      const out = g.from === "user";
-      const lastTime = g.items[g.items.length - 1].time;
-      return `
-        <div class="msg-group ${out ? "msg-group--out" : "msg-group--in"}">
-          ${out ? "" : `<span class="msg-avatar" style="background:${c.color}">${c.initial}</span>`}
-          ${g.items.map((m) => `<div class="bubble ${out ? "bubble--out" : "bubble--in"}">${thoatHtml(m.text)}</div>`).join("")}
-          <span class="msg-time">${thoatHtml(lastTime)}</span>
-        </div>`;
-    };
-    thread.innerHTML =
-      `<div class="thread-pin">
+    const msgs = messagesById[activeId];
+    const pin = `
+      <div class="thread-pin">
         ${htmlLogo(c)}
         <div><strong>${thoatHtml(job.title)}</strong><small>Đang trao đổi về vị trí này · ${thoatHtml(job.salary)}</small></div>
         <a class="btn btn-soft btn-sm" href="/jobs?id=${job.id}">Xem job</a>
-      </div>
-      <span class="day-sep">Hôm nay</span>` + groups.map(htmlNhomTin).join("");
+      </div>`;
+
+    if (msgs === "loading") {
+      thread.innerHTML = `${pin}<div class="thread-state"><span class="spinner"></span></div>`;
+      return;
+    }
+    if (msgs === "error") {
+      thread.innerHTML = `${pin}<div class="thread-state"><p>Không tải được tin nhắn.</p><button class="btn btn-soft btn-sm" type="button" id="thread-retry">Thử lại</button></div>`;
+      return;
+    }
+    if (!msgs.length) {
+      thread.innerHTML = `${pin}<div class="thread-state"><p>Chưa có tin nhắn. Hãy gửi lời chào tới ${thoatHtml(c.name)}!</p></div>`;
+      return;
+    }
+
+    // Gom tin liên tiếp cùng người gửi và cùng ngày thành 1 nhóm (kiểu Messenger)
+    const groups = [];
+    msgs.forEach((m) => {
+      const last = groups[groups.length - 1];
+      if (last && last.from === m.from && last.date === m.date) last.items.push(m);
+      else groups.push({ from: m.from, date: m.date, items: [m] });
+    });
+    let ngayTruoc = null;
+    const html = groups.map((g) => {
+      const out = g.from === "user";
+      const cuoi = g.items[g.items.length - 1];
+      const sep = g.date !== ngayTruoc ? `<span class="day-sep">${nhanNgay(g.date)}</span>` : "";
+      ngayTruoc = g.date;
+      return `${sep}
+        <div class="msg-group ${out ? "msg-group--out" : "msg-group--in"}">
+          ${out ? "" : `<span class="msg-avatar" style="background:${c.color}">${c.initial}</span>`}
+          ${g.items.map((m) => `<div class="bubble ${out ? "bubble--out" : "bubble--in"} ${m.pending ? "is-pending" : ""} ${m.failed ? "is-failed" : ""}">${thoatHtml(m.text)}</div>`).join("")}
+          <span class="msg-time">${cuoi.failed ? "Gửi lỗi" : cuoi.pending ? "Đang gửi…" : thoatHtml(cuoi.time)}</span>
+        </div>`;
+    });
+    thread.innerHTML = pin + html.join("");
     thread.scrollTop = thread.scrollHeight;
-    veIcon();
+  };
+
+  /** Tải toàn bộ tin (lần đầu) hoặc chỉ tin mới hơn tin cuối (hỏi lại định kỳ). */
+  const taiTin = async (id, chiTinMoi = false) => {
+    const cu = Array.isArray(messagesById[id]) ? messagesById[id] : [];
+    const cuoi = [...cu].reverse().find((m) => !m.pending && !m.failed);
+    const url = `/api/applications/${id}/messages${chiTinMoi && cuoi ? `?after=${cuoi.id}` : ""}`;
+    if (!chiTinMoi) {
+      messagesById[id] = "loading";
+      if (id === activeId) veLuongTin();
+    }
+    try {
+      const data = await Api.goi("GET", url);
+      const daCo = new Set(cu.map((m) => m.id));
+      const moi = data.messages.filter((m) => !daCo.has(m.id));
+      if (chiTinMoi && !moi.length) return;
+      messagesById[id] = chiTinMoi ? [...cu.filter((m) => !m.pending), ...moi, ...cu.filter((m) => m.pending)] : data.messages;
+      if (chiTinMoi) {
+        const conv = layHoiThoai(id);
+        conv.last = moi[moi.length - 1].text;
+        conv.time = moi[moi.length - 1].time;
+      }
+      veDanhSachHoiThoai();
+      if (id === activeId) veLuongTin();
+    } catch (ex) {
+      if (!chiTinMoi) {
+        messagesById[id] = "error";
+        if (id === activeId) veLuongTin();
+      }
+    }
   };
 
   /* Panel thông tin hội thoại (cột phải) */
-  // Bảng màu chủ đề sáng, rực kiểu Messenger — mỗi hội thoại nhớ màu riêng
   const THEMES = [
     { name: "Jobly Violet", color: "#7c5cff" },
     { name: "Messenger Blue", color: "#0a84ff" },
@@ -1194,7 +1251,7 @@ function khoiTrangChat() {
     { name: "Lime", color: "#a3d900" },
     { name: "Navy", color: "#3457d5" },
   ];
-  const THEME_KEY = "jobly_chat_theme";
+  const THEME_KEY = `jobly_chat_theme_${USER.id}`;
   const themeMap = (() => {
     try {
       return JSON.parse(localStorage.getItem(THEME_KEY) || "{}");
@@ -1202,9 +1259,7 @@ function khoiTrangChat() {
       return {};
     }
   })();
-  // Mặc định: mỗi hội thoại một màu khác nhau cho sinh động
-  const DEFAULT_THEME = { "may-creative": 0, techwind: 1, datanest: 8, novastack: 3 };
-  const chiSoMau = (id) => themeMap[id] ?? DEFAULT_THEME[id] ?? 0;
+  const chiSoMau = (id) => themeMap[id] ?? 0;
   const datMau = (id, idx) => {
     themeMap[id] = idx;
     localStorage.setItem(THEME_KEY, JSON.stringify(themeMap));
@@ -1213,18 +1268,16 @@ function khoiTrangChat() {
   const veCotThongTin = (conv) => {
     const c = layCongTy(conv.companyId);
     const job = layViecTheoId(conv.jobId);
-    const app = APPLICATIONS.find((a) => a.jobId === job.id);
-    const status = app?.steps.find((s) => s.status === "current")?.label || "Đã ứng tuyển";
-    const photos = JOBS.filter((j) => j.id !== job.id).slice(0, 6);
+    const app = APPLICATIONS.find((a) => a.id === conv.id);
     chon("#chat-info").innerHTML = `
       <div class="chat-info-head">
         ${htmlLogo(c)}
         <h3>${thoatHtml(c.name)} ${htmlXacThuc(c)}</h3>
-        <p>${conv.online ? "Đang hoạt động" : `Hoạt động ${conv.time.toLowerCase()}`} · ${thoatHtml(c.location)}</p>
+        <p>${thoatHtml(c.location)}</p>
         <div class="chat-info-actions">
-          <a href="/companies?id=${c.id}"><span class="icon-btn">${htmlIcon("building-2")}</span>Công ty</a>
+          <a href="/companies?id=${encodeURIComponent(c.id)}"><span class="icon-btn">${htmlIcon("building-2")}</span>Công ty</a>
           <a href="/jobs?id=${job.id}"><span class="icon-btn">${htmlIcon("briefcase")}</span>Xem job</a>
-          <button type="button" id="mute-btn"><span class="icon-btn">${htmlIcon("bell")}</span>Thông báo</button>
+          <a href="/applications"><span class="icon-btn">${htmlIcon("route")}</span>Tiến trình</a>
         </div>
       </div>
 
@@ -1233,10 +1286,10 @@ function khoiTrangChat() {
       </div>
 
       <div class="info-block">
-        <h4>Ứng tuyển ${htmlIcon("chevron-right")}</h4>
+        <h4>Ứng tuyển</h4>
         <a class="job-brief" href="/applications">
           <div><strong>${thoatHtml(job.title)}</strong><small>${thoatHtml(job.salary)} · ${thoatHtml(job.type)}</small></div>
-          <span class="status-tag">${thoatHtml(status)}</span>
+          <span class="status-tag">${thoatHtml(app?.statusLabel || "Đã ứng tuyển")}</span>
         </a>
       </div>
 
@@ -1251,100 +1304,101 @@ function khoiTrangChat() {
       </div>
 
       <div class="info-block">
-        <h4>Ảnh đã chia sẻ <span class="muted" style="font-weight:600">${photos.length}</span></h4>
-        <div class="media-grid">
-          ${photos.map((j) => `<a href="/jobs?id=${j.id}"><img src="${j.image}" alt="" loading="lazy"></a>`).join("")}
-        </div>
-      </div>
-
-      <div class="info-block">
-        <h4>File đã chia sẻ</h4>
-        <div class="file-item"><span class="cv-icon">${htmlIcon("file-text")}</span><div><strong>${thoatHtml(USER.cv?.name || "Chưa có CV")}</strong><small>Bạn đã gửi</small></div></div>
-        <div class="file-item"><span class="cv-icon" style="background:linear-gradient(135deg,#3b82f6,#60a5fa)">${htmlIcon("file")}</span><div><strong>JD_${thoatHtml(job.title.replace(/\s+/g, "_"))}.pdf</strong><small>PDF · 340 KB · ${thoatHtml(c.name)}</small></div></div>
-      </div>
-
-      <div class="info-block">
-        <h4>Tùy chọn</h4>
-        <button class="info-row" type="button" id="notif-row">${htmlIcon("bell-off")}Tắt thông báo<span class="switch" id="notif-switch"></span></button>
-        <button class="info-row" type="button" data-toast="Đã ghim hội thoại">${htmlIcon("pin")}Ghim hội thoại</button>
-        <button class="info-row is-danger" type="button" data-toast="Đã gửi báo cáo tới Jobly">${htmlIcon("flag")}Báo cáo</button>
+        <h4>CV trong hồ sơ</h4>
+        ${
+          USER.cv
+            ? `<a class="file-item" href="${USER.cv.downloadUrl}" target="_blank" rel="noopener"><span class="cv-icon">${htmlIcon("file-text")}</span><div><strong>${thoatHtml(USER.cv.name)}</strong><small>Nhà tuyển dụng xem được CV này</small></div></a>`
+            : `<p class="muted" style="font-size:.84rem">Bạn chưa tải CV. <a href="/profile">Tải lên</a> để nhà tuyển dụng xem kinh nghiệm của bạn.</p>`
+        }
       </div>`;
     veIcon();
   };
 
   const apMauChat = () => {
-    const t = THEMES[chiSoMau(activeId)];
+    const t = THEMES[chiSoMau(activeId)] || THEMES[0];
     const shell = chon(".chat-shell");
     shell.style.setProperty("--chat-accent", t.color);
-    // Gradient rất nhẹ (màu chính → sáng hơn 10%) để bubble tươi nhưng không tối
     shell.style.setProperty(
       "--chat-accent-grad",
       `linear-gradient(135deg, ${t.color} 0%, color-mix(in srgb, ${t.color} 82%, white) 100%)`
     );
   };
 
+  /** Giảm badge "Tin nhắn" trên menu khi mở hội thoại có tin chưa đọc. */
+  const docHet = (conv) => {
+    if (!conv.unread) return;
+    JOBLY.unread = Math.max(0, JOBLY.unread - conv.unread);
+    conv.unread = 0;
+    chonHet('a[href="/chat"] .nav-badge').forEach((b) => (JOBLY.unread ? (b.textContent = JOBLY.unread) : b.remove()));
+  };
+
   const moHoiThoai = (id) => {
-    activeId = id;
-    const conv = CONVERSATIONS.find((c) => c.id === id);
+    activeId = Number(id);
+    const conv = layHoiThoai(activeId);
     const c = layCongTy(conv.companyId);
     const job = layViecTheoId(conv.jobId);
-    conv.unread = 0;
-    if (!messagesById[id]) messagesById[id] = dungTinNhan(conv);
+    const app = APPLICATIONS.find((a) => a.id === conv.id);
+    docHet(conv);
+    history.replaceState(null, "", `/chat?c=${conv.id}`);
     veCotThongTin(conv);
     apMauChat();
     chon("#chat-logo").style.background = c.color;
     chon("#chat-logo").textContent = c.initial;
     chon("#chat-name").innerHTML = `${thoatHtml(c.name)} ${htmlXacThuc(c)}`;
-    chon("#chat-status").innerHTML = conv.online
-      ? `<span class="online-dot"></span>Đang hoạt động · ${thoatHtml(job.title)}`
-      : `Hoạt động ${conv.time.toLowerCase()} · ${thoatHtml(job.title)}`;
-    chon("#chat-company-link").href = `/companies?id=${c.id}`;
-    chon("#quick-replies").style.display = "none";
+    chon("#chat-status").textContent = `${job.title} · ${app?.statusLabel || "Đã ứng tuyển"}`;
+    chon("#chat-company-link").href = `/companies?id=${encodeURIComponent(c.id)}`;
     layout.classList.remove("show-list");
     veDanhSachHoiThoai();
-    veLuongTin();
+    if (Array.isArray(messagesById[activeId])) {
+      veLuongTin();
+      taiTin(activeId, true);
+    } else {
+      taiTin(activeId);
+    }
+    input.focus({ preventScroll: true });
   };
 
-  const gioHienTai = () => new Date().toTimeString().slice(0, 5);
-
-  const guiTin = (text) => {
+  const guiTin = async (text) => {
     const t = text.trim();
-    if (!t) return;
-    messagesById[activeId].push({ id: Date.now(), from: "user", text: t, time: gioHienTai() });
+    if (!t || !Array.isArray(messagesById[activeId])) return;
+    if (t.length > 2000) return thongBao("Tin nhắn tối đa 2000 ký tự", "circle-alert");
+    const id = activeId;
+    const tam = { id: `tam-${Date.now()}`, from: "user", text: t, time: "", date: new Date().toISOString().slice(0, 10), pending: true };
+    messagesById[id].push(tam);
+    input.value = "";
     veLuongTin();
-    chon("#chat-input").value = "";
-    thread.insertAdjacentHTML("beforeend", `<div class="typing" id="typing"><i></i><i></i><i></i></div>`);
-    thread.scrollTop = thread.scrollHeight;
-    window.setTimeout(() => {
-      chon("#typing")?.remove();
-      messagesById[activeId].push({
-        id: Date.now() + 1,
-        from: "recruiter",
-        text: "Cảm ơn bạn! Mình đã ghi nhận và sẽ gửi lịch chi tiết qua email. Hẹn gặp bạn 💜",
-        time: gioHienTai(),
-      });
-      veLuongTin();
-    }, 1100);
+    try {
+      const data = await Api.goi("POST", `/api/applications/${id}/messages`, { body: t });
+      const list = messagesById[id];
+      // Lượt hỏi định kỳ có thể đã mang tin này về trước khi POST trả lời → chỉ bỏ bong bóng tạm.
+      if (list.some((m) => m.id === data.message.id)) list.splice(list.indexOf(tam), 1);
+      else list.splice(list.indexOf(tam), 1, data.message);
+      const conv = layHoiThoai(id);
+      conv.last = data.message.text;
+      conv.time = data.message.time;
+      veDanhSachHoiThoai();
+    } catch (ex) {
+      tam.pending = false;
+      tam.failed = true;
+      if (id === activeId && !input.value) input.value = t;
+      thongBao(ex.message, "circle-alert");
+    }
+    if (id === activeId) veLuongTin();
   };
 
   chon("#chat-form").addEventListener("submit", (e) => {
     e.preventDefault();
-    guiTin(chon("#chat-input").value);
-  });
-  chon("#quick-replies").addEventListener("click", (e) => {
-    const btn = e.target.closest("button");
-    if (!btn) return;
-    guiTin(`Em chọn ${btn.textContent.trim()} ạ.`);
-    btn.remove();
-    thongBao("Đã gửi lựa chọn lịch phỏng vấn", "calendar-check");
+    guiTin(input.value);
   });
   convItems.addEventListener("click", (e) => {
     const item = e.target.closest("[data-conv]");
     if (item) moHoiThoai(item.dataset.conv);
   });
+  thread.addEventListener("click", (e) => {
+    if (e.target.closest("#thread-retry")) taiTin(activeId);
+  });
   chon("#chat-back")?.addEventListener("click", () => layout.classList.add("show-list"));
 
-  // Panel thông tin: đổi màu chủ đề, tìm trong hội thoại, toggle drawer, toast
   const info = chon("#chat-info");
   const infoBackdrop = chon("#chat-info-backdrop");
   const batTatCotThongTin = (open) => {
@@ -1356,21 +1410,10 @@ function khoiTrangChat() {
 
   info.addEventListener("click", (e) => {
     const dot = e.target.closest("[data-theme]");
-    if (dot) {
-      datMau(activeId, Number(dot.dataset.theme));
-      chonHet(".theme-dot", info).forEach((d) => d.classList.toggle("is-active", d === dot));
-      apMauChat();
-      thongBao(`Đã đổi màu hội thoại: ${THEMES[chiSoMau(activeId)].name}`, "palette");
-      return;
-    }
-    if (e.target.closest("#notif-row") || e.target.closest("#mute-btn")) {
-      const sw = chon("#notif-switch");
-      const on = sw.classList.toggle("is-on");
-      thongBao(on ? "Đã tắt thông báo hội thoại" : "Đã bật thông báo", on ? "bell-off" : "bell");
-      return;
-    }
-    const t = e.target.closest("[data-toast]");
-    if (t) thongBao(t.dataset.toast, "check");
+    if (!dot) return;
+    datMau(activeId, Number(dot.dataset.theme));
+    chonHet(".theme-dot", info).forEach((d) => d.classList.toggle("is-active", d === dot));
+    apMauChat();
   });
   info.addEventListener("input", (e) => {
     if (e.target.id !== "thread-search") return;
@@ -1380,10 +1423,6 @@ function khoiTrangChat() {
       b.style.opacity = hit ? "" : "0.25";
     });
   });
-  chon(".chat-header-actions")?.addEventListener("click", (e) => {
-    const t = e.target.closest("[data-toast]");
-    if (t) thongBao(t.dataset.toast, "phone");
-  });
   chon("#conv-search")?.addEventListener("input", (e) => {
     const q = e.target.value.toLowerCase();
     chonHet(".conv-item", convItems).forEach((el) => {
@@ -1391,9 +1430,18 @@ function khoiTrangChat() {
     });
   });
 
+  // Hỏi tin mới định kỳ, chỉ khi tab đang hiển thị để không tốn request
+  hoiLai = window.setInterval(() => {
+    if (document.visibilityState === "visible" && Array.isArray(messagesById[activeId])) taiTin(activeId, true);
+  }, CHAT_HOI_LAI_MS);
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible" && Array.isArray(messagesById[activeId])) taiTin(activeId, true);
+  });
+  window.addEventListener("pagehide", () => window.clearInterval(hoiLai));
+
   moHoiThoai(activeId);
   // Mobile: không có ?c= thì hiện list hội thoại trước, ẩn thread
-  if (window.matchMedia("(max-width: 960px)").matches && !thamSoUrl("c")) layout.classList.add("show-list");
+  if (window.matchMedia("(max-width: 960px)").matches && !moSanHoiThoai) layout.classList.add("show-list");
 }
 
 /* ---------- APPLICATIONS ----------

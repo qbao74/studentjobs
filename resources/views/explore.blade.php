@@ -9,7 +9,7 @@
       <h1 class="page-title" id="page-title">Khám phá thêm</h1>
       <p class="page-sub" id="page-sub">Những cơ hội khác có thể phù hợp với bạn.</p>
     </div>
-    <span class="chip" id="result-count" style="margin-top:8px">8 công việc</span>
+    <span class="chip" id="result-count" style="margin-top:8px"></span>
   </header>
 
   <form class="search-bar search-bar--wide" id="explore-form">

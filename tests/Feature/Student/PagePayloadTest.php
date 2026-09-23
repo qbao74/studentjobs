@@ -78,6 +78,17 @@ class PagePayloadTest extends TestCase
         $this->actingAs($employer->user)->get('/explore')->assertRedirect('/employer');
     }
 
+    public function test_chat_page_has_no_placeholder_controls(): void
+    {
+        $student = Student::factory()->create();
+
+        $this->actingAs($student->user)->get('/chat')
+            ->assertOk()
+            ->assertDontSee('Gọi thoại')
+            ->assertDontSee('company.html')
+            ->assertDontSee('quick-replies');
+    }
+
     public function test_user_text_is_escaped_inside_script_payload(): void
     {
         JobPost::factory()->create(['title' => '</script><script>alert(1)</script>']);
