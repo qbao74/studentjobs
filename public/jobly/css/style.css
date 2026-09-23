@@ -4366,3 +4366,249 @@ button.is-loading {
     flex-wrap: wrap;
   }
 }
+
+/* ------------------------------------------------------------
+   23 PANEL — khu nhà tuyển dụng / admin (layout/panel.blade.php)
+   ------------------------------------------------------------ */
+.panel-body {
+  background: var(--bg, #f6f7fb);
+}
+
+.panel-main {
+  max-width: 1180px;
+}
+
+.panel-avatar {
+  display: grid;
+  place-items: center;
+  flex: none;
+  font-weight: 800;
+  color: #fff;
+  background: linear-gradient(135deg, var(--primary), #8b5cf6);
+}
+
+.sidebar-user-row .sidebar-user {
+  cursor: default;
+}
+
+.flash {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  margin-bottom: 16px;
+  padding: 12px 16px;
+  border-radius: 14px;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.flash svg {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  margin-top: 1px;
+}
+
+.flash ul {
+  margin-top: 4px;
+  padding-left: 18px;
+  font-weight: 500;
+  list-style: disc;
+}
+
+.flash--ok {
+  color: #166534;
+  background: #dcfce7;
+}
+
+.flash--error {
+  color: #991b1b;
+  background: #fee2e2;
+}
+
+.panel-stats {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-bottom: 18px;
+}
+
+.panel-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  align-items: start;
+}
+
+.panel-grid > .section {
+  margin-top: 0;
+}
+
+.panel-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.panel-row:last-of-type {
+  border-bottom: 0;
+}
+
+.panel-row > div {
+  flex: 1;
+  min-width: 0;
+}
+
+.panel-row strong,
+.panel-table td strong {
+  display: block;
+  font-size: 0.92rem;
+}
+
+.panel-row small,
+.panel-table td small {
+  display: block;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.panel-table-wrap {
+  margin-top: 14px;
+  overflow-x: auto;
+}
+
+.panel-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+
+.panel-table th {
+  padding: 12px 14px;
+  text-align: left;
+  font-size: 0.74rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--muted);
+  border-bottom: 1px solid var(--border);
+}
+
+.panel-table td {
+  padding: 12px 14px;
+  vertical-align: middle;
+  border-bottom: 1px solid var(--border);
+}
+
+.panel-table tr:last-child td {
+  border-bottom: 0;
+}
+
+.t-right {
+  text-align: right !important;
+}
+
+.panel-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
+  align-items: center;
+}
+
+.panel-actions form {
+  margin: 0;
+}
+
+.panel-form .panel-actions {
+  justify-content: flex-start;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px 18px;
+}
+
+.form-field--wide {
+  grid-column: 1 / -1;
+}
+
+.form-field small.muted {
+  display: block;
+  margin-top: 4px;
+  font-weight: 400;
+}
+
+.form-field .form-error {
+  display: block;
+  min-height: 0;
+  margin-top: 4px;
+}
+
+.form-check {
+  display: flex !important;
+  align-items: center;
+  gap: 8px;
+  align-self: end;
+  padding-bottom: 10px;
+}
+
+.form-check input[type="checkbox"] {
+  width: auto;
+  margin: 0;
+}
+
+.panel-pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.panel-pager span[aria-disabled] {
+  opacity: 0.4;
+}
+
+.status-tag[data-status="open"],
+.status-tag[data-status="hired"] {
+  color: #166534;
+  background: #dcfce7;
+}
+
+.status-tag[data-status="closed"],
+.status-tag[data-status="pending"] {
+  color: #475569;
+  background: #e2e8f0;
+}
+
+.status-tag[data-status="hidden"],
+.status-tag[data-status="rejected"] {
+  color: #991b1b;
+  background: #fee2e2;
+}
+
+.status-tag[data-status="interview"] {
+  color: #9a3412;
+  background: #ffedd5;
+}
+
+a.filter-chip {
+  text-decoration: none;
+}
+
+@media (max-width: 960px) {
+  .panel-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .panel-grid,
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .panel-main {
+    padding-bottom: 110px;
+  }
+}

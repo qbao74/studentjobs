@@ -8,6 +8,8 @@ use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\RegisterController;
 use App\Http\Controllers\CvDownloadController;
+use App\Http\Controllers\Employer\DashboardController as EmployerDashboardController;
+use App\Http\Controllers\Employer\JobPostController as EmployerJobPostController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('guest')->group(function () {
@@ -57,6 +59,18 @@ Route::prefix('api')->name('api.')->middleware(['auth', 'throttle:120,1'])->grou
 });
 
 Route::get('/cvs/{cv}/download', CvDownloadController::class)->middleware('auth')->name('cvs.download');
+
+Route::prefix('employer')->name('employer.')->middleware(['auth', 'role:employer'])->group(function () {
+    Route::get('/', EmployerDashboardController::class)->name('dashboard');
+
+    Route::get('/jobs', [EmployerJobPostController::class, 'index'])->name('jobs.index');
+    Route::get('/jobs/create', [EmployerJobPostController::class, 'create'])->name('jobs.create');
+    Route::post('/jobs', [EmployerJobPostController::class, 'store'])->middleware('throttle:20,1')->name('jobs.store');
+    Route::get('/jobs/{job}/edit', [EmployerJobPostController::class, 'edit'])->name('jobs.edit');
+    Route::put('/jobs/{job}', [EmployerJobPostController::class, 'update'])->name('jobs.update');
+    Route::patch('/jobs/{job}/status', [EmployerJobPostController::class, 'updateStatus'])->name('jobs.status');
+    Route::delete('/jobs/{job}', [EmployerJobPostController::class, 'destroy'])->name('jobs.destroy');
+});
 
 Route::middleware(['auth', 'role:student'])->group(function () {
     Route::view('/match', 'match')->name('match');
