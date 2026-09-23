@@ -29,11 +29,7 @@ class LoginController extends Controller
 
         $request->session()->regenerate();
 
-        return redirect()->intended(match ($request->user()->role) {
-            'employer' => '/employer',
-            'admin' => '/admin',
-            default => '/',
-        });
+        return redirect()->intended($request->user()->role->homePath());
     }
 
     public function destroy(Request $request)

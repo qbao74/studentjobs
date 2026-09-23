@@ -16,13 +16,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'role' => \App\Http\Middleware\EnsureRole::class,
         ]);
         $middleware->redirectGuestsTo('/login');
-        $middleware->redirectUsersTo(function (Request $request) {
-            return match ($request->user()->role) {
-                'employer' => '/employer',
-                'admin' => '/admin',
-                default => '/',
-            };
-        });
+        $middleware->redirectUsersTo(fn (Request $request) => $request->user()->role->homePath());
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(
