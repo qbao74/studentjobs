@@ -874,4 +874,219 @@ Tải CV → `CvService::upload` → `ProfileRefresher::refresh` → `Recommenda
 Cần kiểm tra:
 - Mọi chỗ đổi hồ sơ, kỹ năng, CV phải gọi `ProfileRefresher::refresh`. Mọi chỗ đổi tin phải gọi `refreshForJob`.
 
+---
+
+# PHASE 06 — Backend cho sinh viên
+
+Các API nằm trong nhóm `web` với tiền tố `/api`, dùng chung session đăng nhập. JS gửi CSRF token qua header `X-CSRF-TOKEN`, lấy từ thẻ `<meta name="csrf-token">`. Lỗi luôn trả JSON `{ "message": "..." }`, lỗi validate có thêm `errors`.
+
+| Method | URL | Ý nghĩa |
+|---|---|---|
+| POST | `/api/jobs/{id}/apply` | Ứng tuyển (201, trùng → 409, tin đóng → 422) |
+| DELETE | `/api/applications/{id}` | Rút đơn (chỉ khi chưa vào vòng trong) |
+| POST | `/api/jobs/{id}/save` | Lưu/bỏ lưu việc |
+| POST | `/api/companies/{slug}/follow` | Theo dõi/bỏ theo dõi công ty |
+| PUT | `/api/profile` | Sửa hồ sơ → trả `state` mới |
+| PUT | `/api/profile/skills` | Đặt lại danh sách kỹ năng → `state` |
+| POST | `/api/profile/avatar` | Đổi ảnh đại diện → `state` |
+| POST / DELETE | `/api/profile/cv` | Tải lên / xóa CV → `state` |
+| GET | `/cvs/{id}/download` | Tải file CV (theo `CvPolicy`) |
+| GET / POST | `/api/applications/{id}/messages` | Đọc (`?after=`) / gửi tin nhắn |
+
+## Commit: 463ed5b
+
+### Tiêu đề
+feat: Dựng dữ liệu trang sinh viên từ database vào window.JOBLY
+
+### Ngày
+2026-09-23
+
+### Mục đích
+Frontend đang đọc hằng số giả trong `data.js`. Bước này cho server in dữ liệu thật đúng cấu trúc đó vào `window.JOBLY`, để Phase 07 chỉ cần đổi nguồn dữ liệu.
+
+### Đã làm
+- `StudentPresenter`: `job()`, `company()`, `application()`, `message()`, `user()`, trả mảng đúng tên khóa JS đang dùng (`companyId`, `whyMatch`, `steps`...).
+- `JoblyPayload::build($user)`: khách chỉ nhận tin đang mở + công ty. Sinh viên nhận thêm hồ sơ, thống kê thật, đơn, hội thoại, việc đã lưu, công ty theo dõi, số tin chưa đọc, điểm khớp.
+- Tài khoản mới chưa có điểm khớp thì được tính ngay lần đầu mở trang.
+- Tin đã đóng mà sinh viên từng nộp vẫn có trong payload, để trang tiến trình không mất đơn.
+- `ApplicationStatus::timeline()` sinh 5 bước (`done`, `current`, `upcoming`, `rejected`).
+- View composer trong `AppServiceProvider` gắn `$jobly` vào `layout.app`.
+- Middleware `student.or.guest`: nhà tuyển dụng/admin mở trang sinh viên thì được chuyển về khu của mình.
+- Xóa `tests/Feature/ExampleTest.php` (test mẫu gọi `/` không có database).
+
+### Luồng code
+GET `/` → middleware → `Route::view('home')` → Blade render `layout.app` → composer gọi `JoblyPayload::build(auth()->user())` → `<script>window.JOBLY = @json($jobly)</script>`.
+
+### File quan trọng
+- `app/Services/Frontend/JoblyPayload.php`, `app/Services/Frontend/StudentPresenter.php`
+- `app/Providers/AppServiceProvider.php`, `resources/views/layout/app.blade.php`
+- `tests/Feature/Student/PagePayloadTest.php`
+
+### Kiến thức cần nhớ
+- `@json` escape `<`, `>`, `&`, nên tiêu đề tin chứa `</script>` không phá được trang (có test XSS).
+- *View composer* chạy mỗi khi view được render, dùng cho dữ liệu mọi trang đều cần.
+- `withCount(['jobPosts as open_jobs_count' => fn ($q) => $q->open()])` đếm có điều kiện trong một câu SQL.
+
+### Nếu muốn sửa chức năng này
+Cần kiểm tra:
+- Thêm trường cho JS: thêm vào `StudentPresenter`, rồi đọc ở `public/jobly/js`.
+
+## Commit: 90e4e2c
+
+### Tiêu đề
+feat: API ứng tuyển và rút đơn cho sinh viên
+
+### Ngày
+2026-09-23
+
+### Mục đích
+Nút "Ứng tuyển" phải tạo đơn thật trong database.
+
+### Đã làm
+- `ApplicationService::apply()`: tin phải đang mở, chặn trùng bằng kiểm tra trước + bắt `UniqueConstraintViolationException` (bấm đúp).
+- `withdraw()`: chỉ khi đơn còn ở bước Đã gửi/Đã xem.
+- Khách gọi API nhận 401 JSON (không redirect), để JS biết cần mở popup đăng nhập.
+
+### Luồng code
+POST `/api/jobs/5/apply` → `auth` → `role:student` → *route model binding* `JobPost $job` → `ApplicationController::store` → `ApplicationService::apply` → 201 + `application`.
+
+### File quan trọng
+- `app/Services/Student/ApplicationService.php`
+- `app/Http/Controllers/Api/ApplicationController.php`
+- `tests/Feature/Student/ApplicationApiTest.php`
+
+### Kiến thức cần nhớ
+- Ném `ConflictHttpException` (409) hoặc `UnprocessableEntityHttpException` (422) từ service. Laravel tự đổi thành JSON `{ message }`.
+- Test CSRF phải đặt `env` khác `testing`, vì Laravel tự bỏ qua CSRF khi chạy test.
+
+### Nếu muốn sửa chức năng này
+Cần kiểm tra:
+- Đổi điều kiện rút đơn: `ApplicationService::withdraw` + `StudentPresenter::application` (`canWithdraw`).
+
+## Commit: 0ac8359
+
+### Tiêu đề
+feat: API lưu việc và theo dõi công ty
+
+### Ngày
+2026-09-23
+
+### Mục đích
+Thay `localStorage` bằng database, để đổi máy vẫn giữ việc đã lưu.
+
+### Đã làm
+- `BookmarkController::toggleJob`, `toggleCompany` dùng `toggle()` của `belongsToMany`.
+- Tin đóng/ẩn: cho bỏ lưu, không cho lưu mới.
+- Route công ty dùng slug: `{company:slug}`.
+
+### Luồng code
+POST `/api/companies/techwind/follow` → binding theo cột `slug` → `followedCompanies()->toggle(id)` → `{ following, followers }`.
+
+### File quan trọng
+- `app/Http/Controllers/Api/BookmarkController.php`
+- `tests/Feature/Student/BookmarkApiTest.php`
+
+### Kiến thức cần nhớ
+- `toggle()` trả `['attached' => [...], 'detached' => [...]]`, dựa vào đó biết trạng thái mới.
+
+### Nếu muốn sửa chức năng này
+Cần kiểm tra:
+- Bảng `saved_jobs`, `company_follows`.
+
+## Commit: 7a215d9
+
+### Tiêu đề
+feat: API cập nhật hồ sơ, kỹ năng và ảnh đại diện
+
+### Ngày
+2026-09-23
+
+### Mục đích
+Trang hồ sơ trước đây chỉ hiện toast "đã lưu" giả.
+
+### Đã làm
+- `ProfileService::update()`: sửa `users.name` + các cột `students` trong một transaction, rồi `ProfileRefresher`.
+- `syncSkills()`: danh sách gửi lên là toàn bộ kỹ năng mong muốn. So tên không phân biệt hoa thường, chưa có thì tạo. Kỹ năng CV vẫn giữ thì giữ nguồn `cv`.
+- `updateAvatar()`: ảnh ≤ 2MB, jpg/png/webp, lưu disk `public`, xóa ảnh cũ.
+- Trả về `state` (payload mới), vì điểm khớp mọi tin đều có thể đổi.
+
+### Luồng code
+PUT `/api/profile/skills` → validate `skills.*` → `ProfileService::syncSkills` → `detach`/`attach` → `ProfileRefresher` → `JoblyPayload::build` → JSON.
+
+### File quan trọng
+- `app/Services/Student/ProfileService.php`
+- `app/Http/Controllers/Api/ProfileController.php`, `app/Http/Requests/Student/UpdateProfileRequest.php`
+- `tests/Feature/Student/ProfileApiTest.php`
+
+### Kiến thức cần nhớ
+- Cần chạy `php artisan storage:link` một lần để `/storage/avatars/...` mở được trên trình duyệt.
+- Rule `image` + `mimes` + `dimensions` chặn file giả ảnh (ví dụ `.php`).
+
+### Nếu muốn sửa chức năng này
+Cần kiểm tra:
+- Thêm trường hồ sơ: migration → `Student` fillable → `UpdateProfileRequest` → `ProfileService::update` → `StudentPresenter::user`.
+
+## Commit: ab19c39
+
+### Tiêu đề
+feat: API tải lên, xóa và tải về CV có kiểm tra quyền
+
+### Ngày
+2026-09-23
+
+### Mục đích
+Nối `CvService` (Phase 04) ra ngoài qua HTTP.
+
+### Đã làm
+- Validate: ≤ 5MB, đuôi `pdf`/`docx`, MIME hợp lệ. `CvService` kiểm tra thêm: zip đổi đuôi `.docx` bị từ chối trước khi lưu (422).
+- `throttle:10,1` cho upload.
+- `CvDownloadController`: `Gate::authorize('download')`, trả file với tên gốc (UTF-8) + `X-Content-Type-Options: nosniff`.
+- `StudentPresenter` thêm `cv.downloadUrl`.
+
+### Luồng code
+POST `/api/profile/cv` (multipart) → validate → `CvService::upload` → `ProfileRefresher` → JSON `{ message: "Đã tải CV và đọc được N kỹ năng.", state }`.
+
+### File quan trọng
+- `app/Http/Controllers/Api/CvController.php`, `app/Http/Controllers/CvDownloadController.php`
+- `tests/Feature/Student/CvApiTest.php`
+
+### Kiến thức cần nhớ
+- Không bao giờ để file người dùng tải lên nằm trong `public/`. File riêng tư chỉ đi qua controller có kiểm tra quyền.
+- Header `Content-Disposition` có hai tên: `filename=` (không dấu, dự phòng) và `filename*=utf-8''...` (tên thật).
+
+### Nếu muốn sửa chức năng này
+Cần kiểm tra:
+- Đổi dung lượng tối đa: rule `max:5120` (KB) và `upload_max_filesize` trong `php.ini`.
+
+## Commit: 8ee0b66
+
+### Tiêu đề
+feat: API tin nhắn giữa sinh viên và nhà tuyển dụng theo từng đơn
+
+### Ngày
+2026-09-23
+
+### Mục đích
+Thay chat giả (tự trả lời sau 1,1 giây) bằng tin nhắn thật hai chiều.
+
+### Đã làm
+- `MessageService::thread()`: đánh dấu đã đọc tin của người kia, trả tối đa 200 tin gần nhất (cũ → mới), hỗ trợ `?after=id` để hỏi lại định kỳ.
+- `send()`: lưu nội dung nguyên văn (đã `trim`), tối đa 2000 ký tự, `throttle:30,1`.
+- Quyền: chỉ sinh viên của đơn và HR công ty đăng tin. Admin cũng không đọc được.
+
+### Luồng code
+POST `/api/applications/7/messages` → `auth` → `Gate::authorize('message', $application)` → validate → `MessageService::send` → 201.
+
+### File quan trọng
+- `app/Services/MessageService.php`, `app/Http/Controllers/Api/MessageController.php`
+- `tests/Feature/MessageApiTest.php`
+
+### Kiến thức cần nhớ
+- Server lưu văn bản thô. Việc chống XSS làm ở chỗ hiển thị (`thoatHtml()` trong JS, `{{ }}` trong Blade).
+- Polling với `?after=` rẻ hơn tải lại toàn bộ hội thoại.
+
+### Nếu muốn sửa chức năng này
+Cần kiểm tra:
+- Muốn realtime thật: thay polling bằng Laravel Reverb/Echo, API giữ nguyên.
+
 <!-- mục-tiếp-theo -->
