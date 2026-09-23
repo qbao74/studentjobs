@@ -619,4 +619,110 @@ Chứng minh các luật ở trên đúng, và báo ngay nếu sau này ai sửa
 Cần kiểm tra:
 - `php artisan test --filter=LoginTest`.
 
+---
+
+# PHASE 04 — Xử lý CV
+
+Pipeline của phase này: **INPUT** (file) → **DATA EXTRACTION** (chữ thô) → **NORMALIZATION** (chữ chuẩn hóa) → **FEATURE EXTRACTION** (kỹ năng, liên hệ, học vấn).
+
+## Commit: b30deb4
+
+### Tiêu đề
+feat: Trích xuất chữ từ CV dạng PDF và DOCX
+
+### Ngày
+2026-09-23
+
+### Mục đích
+Máy chưa "đọc" được CV nếu chưa lấy được chữ ra khỏi file.
+
+### Đã làm
+- `CvTextExtractor::extract($path, $mime)`: PDF qua `smalot/pdfparser`, DOCX qua `ZipArchive` đọc `word/document.xml`.
+- File hỏng hoặc sai định dạng thì ném `RuntimeException` với câu tiếng Việt.
+- `tests/Support/CvFiles.php` tự tạo file DOCX/PDF thật khi test, repo không cần chứa file nhị phân.
+
+### Luồng code
+`extract()` → `match ($mime)` → `fromPdf()` hoặc `fromDocx()` → `trim()`.
+
+### File quan trọng
+- `app/Services/Cv/CvTextExtractor.php`
+- `tests/Unit/CvTextExtractorTest.php`
+
+### Kiến thức cần nhớ
+- DOCX thực chất là file zip chứa XML. `</w:p>` là hết một đoạn.
+- PDF dạng ảnh scan không có chữ. Bước này trả về chuỗi rỗng, bước sau xử lý.
+
+### Nếu muốn sửa chức năng này
+Cần kiểm tra:
+- Hỗ trợ thêm định dạng: thêm hằng MIME + nhánh `match` + test.
+
+## Commit: 03ac688
+
+### Tiêu đề
+feat: Chuẩn hóa văn bản và nhận diện kỹ năng, liên hệ, học vấn trong CV
+
+### Ngày
+2026-09-23
+
+### Mục đích
+"ReactJS", "react.js", "React" phải được hiểu là cùng một kỹ năng. "Java" không được khớp nhầm vào "JavaScript".
+
+### Đã làm
+- `TextNormalizer`: `normalize()` (thường, bỏ dấu, giữ `+ # . /`), `containsTerm()` (khớp đúng ranh giới từ), `keywords()` (bỏ stopword).
+- `SkillExtractor`: dò tên + `aliases` của từng kỹ năng trong danh mục. Viết tắt ≤ 2 ký tự (`AI`, `UI`) chỉ tính khi viết HOA, để chữ "ai" trong câu tiếng Việt không bị nhận nhầm.
+- `CvParser::parse()` trả về `skills`, `email`, `phone`, `education`, `experience_mentions`, `keywords`, `word_count`. Không tìm thấy thì để `null`, không đoán.
+
+### Luồng code
+Chữ thô → `TextNormalizer::normalize` → `SkillExtractor::extract` (so với danh mục) + regex email/sđt/trường → mảng `parsed`.
+
+### File quan trọng
+- `app/Support/TextNormalizer.php`
+- `app/Services/Cv/SkillExtractor.php`, `app/Services/Cv/CvParser.php`
+- `tests/Unit/CvParsingTest.php`
+
+### Kiến thức cần nhớ
+- *Lookbehind/lookahead* `(?<![a-z0-9])` … `(?![a-z0-9])` là cách viết "ranh giới từ" khi tên có ký tự đặc biệt như `c++`, vì `\b` không xử lý được.
+- Đây là nhận diện bằng luật (rule-based), giải thích được vì sao ra kết quả. Không phải mô hình học máy.
+
+### Nếu muốn sửa chức năng này
+Cần kiểm tra:
+- Kỹ năng không được nhận ra: thêm cách viết vào `skills.aliases`.
+
+## Commit: c74d1fe
+
+### Tiêu đề
+feat: Lưu CV riêng tư, cập nhật kỹ năng từ CV và chấm độ đầy đủ hồ sơ
+
+### Ngày
+2026-09-23
+
+### Mục đích
+Nối các bước trên thành một luồng hoàn chỉnh khi sinh viên tải CV.
+
+### Đã làm
+- `CvService::upload()`: xác định loại file → lưu vào `storage/app/private/cvs/{student_id}/<ngẫu-nhiên>.pdf|docx` → phân tích → lưu `cvs` (`parse_status`: `parsed`, `empty`, `failed`) → đồng bộ kỹ năng `source = cv` → xóa file cũ → chấm lại `profile_score`.
+- `CvService::delete()`: xóa file, bản ghi và kỹ năng lấy từ CV.
+- `ProfileScoreCalculator`: 8 tiêu chí, tổng 100, trả kèm danh sách còn thiếu để gợi ý.
+- Hai lỗi phát hiện khi viết test, sửa trước khi commit:
+  - Bug xuất hiện ở: tải CV lần hai không xóa file cũ. Nguyên nhân: `$student->cv` trả quan hệ đã nạp lúc trước (null). Cách sửa: truy vấn lại `$student->cv()->value('path')`.
+  - Bug xuất hiện ở: file DOCX lưu với đuôi `.zip` và bị báo "không hỗ trợ". Nguyên nhân: libmagic nhận một số DOCX là `application/zip`. Cách sửa: `detectType()` kiểm tra đuôi `.docx` + có `word/document.xml`; tự đặt đuôi file khi lưu.
+
+### Luồng code
+Controller (Phase 06) → `CvService::upload($student, $file)` → `detectType` → `storeAs` → `analyze` (`CvTextExtractor` → `CvParser`) → transaction (`Cv::updateOrCreate` + `syncCvSkills`) → `ProfileScoreCalculator::refresh`.
+
+### File quan trọng
+- `app/Services/Cv/CvService.php`
+- `app/Services/Profile/ProfileScoreCalculator.php`
+- `tests/Feature/CvServiceTest.php`
+
+### Kiến thức cần nhớ
+- Disk `local` nằm ở `storage/app/private`, không có URL công khai. Muốn tải file phải qua controller có kiểm tra `CvPolicy`.
+- Không dùng tên file người dùng gửi để lưu, tránh `../../` và ghi đè.
+- Kỹ năng `manual` là lựa chọn của sinh viên, CV mới không được xóa chúng.
+- Quan hệ Eloquent đã nạp sẽ được cache trên object. Cần số liệu mới thì gọi `->cv()` (query) hoặc `->fresh()`.
+
+### Nếu muốn sửa chức năng này
+Cần kiểm tra:
+- Đổi trọng số độ đầy đủ: `ProfileScoreCalculator::CRITERIA` (tổng phải bằng 100).
+
 <!-- mục-tiếp-theo -->
