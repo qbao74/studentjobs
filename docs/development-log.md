@@ -87,4 +87,186 @@ Không có code chạy. Đây là tài liệu.
 Cần kiểm tra:
 - Mục của commit liên quan trong file này.
 
+---
+
+# PHASE 01 — Hoàn thiện database
+
+## Commit: 570a068
+
+### Tiêu đề
+refactor: Xóa ba migration rỗng không tạo bảng nào
+
+### Ngày
+2026-09-23
+
+### Mục đích
+`users.php`, `categories.php`, `skils.php` được tạo nhầm, `up()` chỉ có `//`. Để lại sẽ làm người đọc tưởng có bảng `categories`.
+
+### Đã làm
+- Xóa ba file. Các bảng thật không đổi.
+
+### Luồng code
+`php artisan migrate` đọc thư mục `database/migrations` theo thứ tự tên file, chạy `up()` của file nào chưa có trong bảng `migrations`.
+
+### File quan trọng
+- `database/migrations/`
+
+### Kiến thức cần nhớ
+- Tên file có timestamp ở đầu để quyết định thứ tự chạy.
+- Chỉ nên xóa migration khi app chưa chạy thật trên server. Khi đã deploy, muốn bỏ bảng thì tạo migration mới để drop.
+
+### Nếu muốn sửa chức năng này
+Cần kiểm tra:
+- `php artisan migrate:status` xem migration nào đã chạy.
+
+## Commit: 911dd9d
+
+### Tiêu đề
+fix: Bổ sung lệnh xóa bảng khi rollback cho hai bảng trung gian kỹ năng
+
+### Ngày
+2026-09-23
+
+### Mục đích
+`php artisan migrate:rollback` bị lỗi `no such table: main.job_posts`.
+
+### Đã làm
+- `down()` của `student_skill` và `job_skill` giờ gọi `Schema::dropIfExists(...)`.
+
+### Luồng code
+Rollback chạy `down()` theo thứ tự ngược: `job_skill` → `student_skill` → ... → `skills`.
+
+### File quan trọng
+- `database/migrations/2026_08_26_030703_students_skills.php`
+- `database/migrations/2026_08_26_030714_job_skills.php`
+
+### Kiến thức cần nhớ
+Bug xuất hiện ở: `migrate:rollback` và `migrate:refresh`.
+Nguyên nhân: `down()` rỗng nên `job_skill` không bị xóa. Nó vẫn giữ khóa ngoại trỏ tới `job_posts` (đã bị xóa) nên SQLite từ chối khi xóa tiếp `skills`.
+Cách sửa: mỗi `Schema::create` trong `up()` phải có `Schema::dropIfExists` tương ứng trong `down()`.
+Commit sửa: `911dd9d`.
+
+### Nếu muốn sửa chức năng này
+Cần kiểm tra:
+- Chạy `migrate:rollback` rồi `migrate` sau mỗi migration mới.
+
+## Commit: b8516b8
+
+### Tiêu đề
+feat: Thêm trạng thái khóa tài khoản và trạng thái tin tuyển dụng
+
+### Ngày
+2026-09-23
+
+### Mục đích
+Admin cần khóa được tài khoản. Nhà tuyển dụng cần đóng hoặc ẩn tin. Nhà tuyển dụng cần ghi chú cho từng đơn.
+
+### Đã làm
+- `users.is_active` (mặc định `true`) + index `role` (admin lọc theo vai trò).
+- `job_posts.status` (`open`, `closed`, `hidden`), `job_posts.is_remote` + index ghép `(status, created_at)`.
+- `applications.note` + index `status`.
+
+### Luồng code
+Migration mới dùng `Schema::table` (sửa bảng có sẵn) thay vì sửa file migration cũ.
+
+### File quan trọng
+- `database/migrations/2026_09_23_000001_add_status_columns.php`
+
+### Kiến thức cần nhớ
+- Index ghép `(status, created_at)` phục vụ đúng câu hỏi hay gặp nhất: "tin đang mở, mới nhất trước".
+- `down()` phải xóa index trước rồi mới xóa cột.
+
+### Nếu muốn sửa chức năng này
+Cần kiểm tra:
+- Enum `JobStatus` (Phase 02) phải khớp các giá trị của cột `status`.
+
+## Commit: 14ad47f
+
+### Tiêu đề
+feat: Thêm ràng buộc không trùng cho kỹ năng, hồ sơ và bảng trung gian
+
+### Ngày
+2026-09-23
+
+### Mục đích
+Chặn dữ liệu trùng ngay ở database, kể cả khi code quên kiểm tra: một kỹ năng hai lần, một user hai hồ sơ, một sinh viên gắn cùng kỹ năng hai lần.
+
+### Đã làm
+- `skills.ten_skill` đổi thành `name` (unique), thêm `aliases` (json) để nhận diện kỹ năng trong CV.
+- `students.user_id`, `employers.user_id` unique. `employers.position` (chức vụ).
+- `student_skill`: unique `(student_id, skill_id)`, cột `source` (`manual` hoặc `cv`).
+- `job_skill`: unique `(job_post_id, skill_id)`.
+- Seeder đổi `ten_skill` thành `name` trong cùng commit để `db:seed` vẫn chạy.
+
+### Luồng code
+Insert trùng → database ném `UniqueConstraintViolationException` → code bắt lỗi hoặc dùng `firstOrCreate` / `syncWithoutDetaching`.
+
+### File quan trọng
+- `database/migrations/2026_09_23_000002_add_unique_constraints.php`
+- `database/seeders/JobPlatformSeeder.php`
+
+### Kiến thức cần nhớ
+- Validation ở controller là lớp chặn thứ nhất. Unique ở database là lớp cuối, chống cả khi hai request đến cùng lúc.
+- `renameColumn` phải tách ra một `Schema::table` riêng trước khi tạo index trên tên mới.
+
+### Nếu muốn sửa chức năng này
+Cần kiểm tra:
+- Mọi chỗ còn dùng `ten_skill`: `rg ten_skill`.
+
+## Commit: b22e625
+
+### Tiêu đề
+feat: Mở rộng bảng CV và kết quả khớp để lưu dữ liệu phân tích
+
+### Ngày
+2026-09-23
+
+### Mục đích
+Pipeline AI cần tách rõ: dữ liệu thô (file), dữ liệu đã xử lý (chữ trích ra, kỹ năng tìm được), điểm từng tiêu chí và tổng điểm.
+
+### Đã làm
+- `cvs`: unique `student_id` (mỗi sinh viên một CV), `mime_type`, `size`, `parse_status`, `parse_error`.
+- `job_recommendations`: `breakdown` (json điểm từng tiêu chí), index `(student_id, score)`.
+
+### Luồng code
+Tải CV → lưu file (`path`) → trích chữ (`extracted_text`) → tách dữ liệu (`parsed`) → `parse_status`. Chấm điểm → `score` + `breakdown` + `pros` / `cons` / `comment`.
+
+### File quan trọng
+- `database/migrations/2026_09_23_000003_extend_cvs_and_recommendations.php`
+
+### Kiến thức cần nhớ
+- `parse_status = empty` nghĩa là file đọc được nhưng không có chữ (CV dạng ảnh). Khi đó hệ thống dùng kỹ năng sinh viên tự chọn.
+
+### Nếu muốn sửa chức năng này
+Cần kiểm tra:
+- `app/Services/Cv` và `app/Services/Matching` (Phase 04–05).
+
+## Commit: b67b039
+
+### Tiêu đề
+feat: Tạo bảng lưu việc, theo dõi công ty và tin nhắn
+
+### Ngày
+2026-09-23
+
+### Mục đích
+Thay các dữ liệu đang nằm trong `localStorage` và dữ liệu chat giả bằng dữ liệu thật trong database.
+
+### Đã làm
+- `saved_jobs`, `company_follows`: bảng trung gian có unique cặp.
+- `messages`: gắn với `application_id`. Chỉ khi đã ứng tuyển mới có hội thoại với công ty, nên không ai nhắn rác được.
+
+### Luồng code
+Sinh viên ứng tuyển → có `applications` → hai bên nhắn tin qua `messages` của đơn đó.
+
+### File quan trọng
+- `database/migrations/2026_09_23_000004_create_saved_jobs_follows_messages_tables.php`
+
+### Kiến thức cần nhớ
+- `read_at` null nghĩa là chưa đọc. Đếm tin chưa đọc: `whereNull('read_at')` và người gửi khác mình.
+
+### Nếu muốn sửa chức năng này
+Cần kiểm tra:
+- `down()` xóa `messages` trước vì nó phụ thuộc `applications`.
+
 <!-- mục-tiếp-theo -->
