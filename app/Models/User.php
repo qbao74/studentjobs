@@ -24,6 +24,12 @@ class User extends Authenticatable
         return in_array($this->role, $roles, true);
     }
 
+    /** Công ty của nhà tuyển dụng; null với vai trò khác. */
+    public function companyId(): ?int
+    {
+        return $this->hasRole(Role::Employer) ? $this->employer?->company_id : null;
+    }
+
     /** Hồ sơ sinh viên — chỉ có khi role = student. */
     public function student(): HasOne
     {
