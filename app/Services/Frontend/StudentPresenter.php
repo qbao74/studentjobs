@@ -120,7 +120,7 @@ class StudentPresenter
             'skillsDetail' => $student->skills->map(fn ($s) => ['name' => $s->name, 'source' => $s->pivot->source])->all(),
             'cv' => $cv ? [
                 'name' => $cv->original_name,
-                'updated' => $cv->updated_at->diffForHumans(),
+                'updated' => $cv->updated_at->gt(now()->subMinute()) ? 'Vừa xong' : $cv->updated_at->diffForHumans(),
                 'status' => $cv->parse_status,
                 'error' => $cv->parse_error,
                 'size' => $cv->size,

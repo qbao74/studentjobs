@@ -294,7 +294,7 @@ function theAISidebar() {
 function veRailVaOverlay() {
   // Rail → bottom sheet trên màn hình hẹp (FAB sparkles + backdrop)
   const rail = chon("#rail");
-  if (rail) {
+  if (rail && !chon(".rail-fab")) {
     const fab = document.createElement("button");
     fab.className = "rail-fab";
     fab.type = "button";
@@ -1478,75 +1478,277 @@ function ngayVn(isoDate) {
 }
 
 /* ---------- PROFILE ----------
-   Hồ sơ USER từ data.js. Nút sửa / thêm skill / CV mới chỉ toast (chưa API).
+   Hồ sơ sinh viên — mọi thao tác gọi API và nhận lại state mới (điểm hồ sơ + điểm khớp tính lại ở server):
+   sửa thông tin (PUT /api/profile), kỹ năng (PUT /api/profile/skills), ảnh (POST /api/profile/avatar),
+   CV (POST / DELETE /api/profile/cv). Sau mỗi lần lưu: napLaiDuLieu(state) rồi vẽ lại trang.
    ---------- */
+const CV_TOI_DA_MB = 5;
+const ANH_TOI_DA_MB = 2;
+
+/** "1536000" byte → "1,5 MB". */
+function dungLuong(bytes) {
+  if (!bytes) return "";
+  return bytes >= 1048576 ? `${(bytes / 1048576).toFixed(1).replace(".", ",")} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`;
+}
+
 /** Khởi tạo trang hồ sơ USER. */
 function khoiTrangHoSo() {
   const root = chon("#profile-root");
   if (!root) return;
-  root.innerHTML = `
+
+  const oTrong = (v) => (v ? thoatHtml(v) : `<span class="muted">Chưa cập nhật</span>`);
+
+  const htmlCv = () => {
+    const cv = USER.cv;
+    if (!cv) {
+      return `
+        <div class="cv-empty">
+          <span class="cv-icon">${htmlIcon("file-up")}</span>
+          <div><strong>Chưa có CV</strong><small>PDF hoặc DOCX, tối đa ${CV_TOI_DA_MB} MB. AI sẽ đọc kỹ năng từ CV để so khớp.</small></div>
+          <button class="btn btn-primary btn-sm" type="button" data-pick="cv">${htmlIcon("upload")} Tải CV lên</button>
+        </div>`;
+    }
+    const loi = cv.status === "failed";
+    return `
+      <div class="cv-card">
+        <span class="cv-icon">${htmlIcon("file-text")}</span>
+        <div>
+          <strong>${thoatHtml(cv.name)}</strong>
+          <small>${thoatHtml(cv.updated)} · ${dungLuong(cv.size)}</small>
+        </div>
+        <div class="cv-actions">
+          <a class="btn btn-soft btn-sm" href="${cv.downloadUrl}" target="_blank" rel="noopener">${htmlIcon("eye")} Xem CV</a>
+          <button class="btn btn-ghost btn-sm" type="button" data-pick="cv">${htmlIcon("upload")} Thay CV</button>
+          <button class="btn btn-ghost btn-sm is-danger" type="button" id="cv-delete">${htmlIcon("trash-2")} Xóa</button>
+        </div>
+      </div>
+      <p class="cv-status ${loi ? "is-error" : ""}">
+        ${
+          loi
+            ? `${htmlIcon("circle-alert")} ${thoatHtml(cv.error || "Không đọc được nội dung CV.")}`
+            : cv.foundSkills.length
+              ? `${htmlIcon("sparkles")} AI đọc được: ${cv.foundSkills.map(thoatHtml).join(", ")}`
+              : `${htmlIcon("info")} Chưa nhận ra kỹ năng nào trong CV. Bạn có thể thêm kỹ năng bằng tay ở trên.`
+        }
+      </p>`;
+  };
+
+  const veTrang = () => {
+    root.innerHTML = `
     <article class="card profile-hero">
       <div class="profile-cover"></div>
       <div class="profile-body">
         <div class="profile-id">
-          <img class="profile-avatar" src="${anhDaiDien(USER)}" alt="">
+          <button class="avatar-edit" type="button" data-pick="avatar" aria-label="Đổi ảnh đại diện" title="Đổi ảnh đại diện">
+            <img class="profile-avatar" src="${anhDaiDien(USER)}" alt="">
+            <span>${htmlIcon("camera")}</span>
+          </button>
           <div>
-            <h1>${USER.name}</h1>
-            <p>${USER.year} · ${USER.school}</p>
-            <p>${htmlIcon("map-pin")} ${USER.location}</p>
+            <h1>${thoatHtml(USER.name)}</h1>
+            <p>${[USER.year, USER.school].filter(Boolean).map(thoatHtml).join(" · ") || "Thêm trường và năm học để AI hiểu bạn hơn"}</p>
+            ${USER.location ? `<p>${htmlIcon("map-pin")} ${thoatHtml(USER.location)}</p>` : ""}
           </div>
         </div>
-        <button class="btn btn-primary" type="button" id="edit-profile">${htmlIcon("pencil")} Chỉnh sửa hồ sơ</button>
+        <div class="profile-actions">
+          <button class="btn btn-primary" type="button" id="edit-profile">${htmlIcon("pencil")} Chỉnh sửa hồ sơ</button>
+          <form method="POST" action="/logout">
+            <input type="hidden" name="_token" value="${Api.token()}">
+            <button class="btn btn-ghost" type="submit">${htmlIcon("log-out")} Đăng xuất</button>
+          </form>
+        </div>
       </div>
     </article>
 
     <div class="profile-stats">
-      <div class="card profile-stat"><strong>${USER.stats.applied}</strong><span>Applications</span></div>
-      <div class="card profile-stat"><strong>${USER.stats.interviewed}</strong><span>Interviews</span></div>
-      <div class="card profile-stat"><strong>${USER.stats.hired}</strong><span>Offers</span></div>
+      <div class="card profile-stat"><strong>${USER.stats.applied}</strong><span>Đơn đã nộp</span></div>
+      <div class="card profile-stat"><strong>${USER.stats.interviewed}</strong><span>Phỏng vấn</span></div>
+      <div class="card profile-stat"><strong>${USER.stats.hired}</strong><span>Trúng tuyển</span></div>
     </div>
 
-    <section class="card section"><h2>About me</h2><p>${USER.bio}</p></section>
+    <section class="card section"><h2>Giới thiệu</h2><p>${USER.bio ? thoatHtml(USER.bio) : `<span class="muted">Viết vài dòng về bản thân, mục tiêu và kinh nghiệm — AI dùng phần này để so khớp mô tả công việc.</span>`}</p></section>
 
     <section class="card section">
       <h2>Kỹ năng</h2>
       <div class="skill-row">
-        ${USER.skills.map((s) => `<span class="skill-tag">${htmlIcon("check")}${s}</span>`).join("")}
-        <button class="skill-tag add" type="button" id="add-skill">${htmlIcon("plus")} Thêm kỹ năng</button>
+        ${USER.skillsDetail
+          .map(
+            (s) => `<span class="skill-tag ${s.source === "cv" ? "from-cv" : ""}" title="${s.source === "cv" ? "Đọc từ CV" : "Bạn tự thêm"}">
+              ${htmlIcon(s.source === "cv" ? "file-text" : "check")}${thoatHtml(s.name)}
+              <button type="button" class="skill-remove" data-remove-skill="${thoatHtml(s.name)}" aria-label="Xóa ${thoatHtml(s.name)}">×</button>
+            </span>`
+          )
+          .join("") || `<span class="muted">Chưa có kỹ năng nào.</span>`}
       </div>
+      <form class="skill-add" id="skill-form">
+        <input type="text" name="skill" list="skill-options" maxlength="50" placeholder="Thêm kỹ năng, VD: Figma" autocomplete="off" required>
+        <datalist id="skill-options">${JOBLY.skillOptions.map((n) => `<option value="${thoatHtml(n)}">`).join("")}</datalist>
+        <button class="btn btn-soft btn-sm" type="submit">${htmlIcon("plus")} Thêm</button>
+      </form>
     </section>
 
     <section class="card section">
       <h2>CV</h2>
-      <div class="cv-card">
-        <span class="cv-icon">${htmlIcon("file-text")}</span>
-        <div><strong>${thoatHtml(USER.cv?.name || "Chưa có CV")}</strong><small>${thoatHtml(USER.cv?.updated || "")}</small></div>
-        <div class="cv-actions">
-          <button class="btn btn-soft btn-sm" type="button" data-toast="Đang mở CV…">${htmlIcon("eye")} Xem CV</button>
-          <button class="btn btn-ghost btn-sm" type="button" data-toast="Chọn file để cập nhật CV">${htmlIcon("upload")} Cập nhật</button>
-        </div>
-      </div>
+      <div id="cv-box">${htmlCv()}</div>
     </section>
 
     <section class="card section">
       <h2>Thông tin</h2>
       <div class="info-grid">
-        <div class="info-item">${htmlIcon("graduation-cap")}<div><small>Trường</small>${USER.school}</div></div>
-        <div class="info-item">${htmlIcon("book-open")}<div><small>Ngành</small>${USER.major}</div></div>
-        <div class="info-item">${htmlIcon("mail")}<div><small>Email</small>${USER.email}</div></div>
-        <div class="info-item">${htmlIcon("phone")}<div><small>Điện thoại</small>${USER.phone}</div></div>
+        <div class="info-item">${htmlIcon("graduation-cap")}<div><small>Trường</small>${oTrong(USER.school)}</div></div>
+        <div class="info-item">${htmlIcon("book-open")}<div><small>Ngành</small>${oTrong(USER.major)}</div></div>
+        <div class="info-item">${htmlIcon("mail")}<div><small>Email</small>${thoatHtml(USER.email)}</div></div>
+        <div class="info-item">${htmlIcon("phone")}<div><small>Điện thoại</small>${oTrong(USER.phone)}</div></div>
       </div>
-    </section>`;
+    </section>
 
-  doCotPhai(`${CotPhai.diemHoSo()}${CotPhai.thongKeNhanh()}${CotPhai.viecGoiY("Việc phù hợp với bạn")}`);
+    <input type="file" id="pick-cv" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" hidden>
+    <input type="file" id="pick-avatar" accept="image/jpeg,image/png,image/webp" hidden>`;
+
+    doCotPhai(`${CotPhai.diemHoSo()}${CotPhai.thongKeNhanh()}${CotPhai.viecGoiY("Việc phù hợp với bạn")}`);
+    veIcon();
+  };
+
+  /** Nhận state mới từ server → cập nhật dữ liệu, vẽ lại trang + sidebar. */
+  const apDung = (data) => {
+    napLaiDuLieu(data.state);
+    veTrang();
+    veKhung();
+    veIcon();
+    thongBao(data.message, "check");
+  };
+
+  /** Chạy một thao tác API, khóa nút trong lúc chờ, lỗi thì báo toast. */
+  const thucHien = async (btn, viec) => {
+    if (btn) {
+      btn.disabled = true;
+      btn.classList.add("is-loading");
+    }
+    try {
+      apDung(await viec());
+    } catch (ex) {
+      thongBao(ex.message, "circle-alert");
+      if (btn?.isConnected) {
+        btn.disabled = false;
+        btn.classList.remove("is-loading");
+      }
+    }
+  };
+
+  const luuKyNang = (btn, names) => thucHien(btn, () => Api.goi("PUT", "/api/profile/skills", { skills: names }));
 
   root.addEventListener("click", (e) => {
-    const t = e.target.closest("[data-toast]");
-    if (t) thongBao(t.dataset.toast, "info");
-    if (e.target.closest("#edit-profile")) thongBao("Chế độ chỉnh sửa sẽ có trong bản kết nối API", "pencil");
-    if (e.target.closest("#add-skill")) thongBao("Gợi ý: React, Motion Design", "sparkles");
+    const pick = e.target.closest("[data-pick]");
+    if (pick) chon(`#pick-${pick.dataset.pick}`).click();
+
+    if (e.target.closest("#edit-profile")) moFormHoSo(apDung);
+
+    const rm = e.target.closest("[data-remove-skill]");
+    if (rm) luuKyNang(rm, USER.skills.filter((s) => s !== rm.dataset.removeSkill));
+
+    const del = e.target.closest("#cv-delete");
+    if (del && window.confirm("Xóa CV? Kỹ năng đọc từ CV cũng sẽ bị gỡ khỏi hồ sơ.")) {
+      thucHien(del, () => Api.goi("DELETE", "/api/profile/cv"));
+    }
   });
+
+  root.addEventListener("submit", (e) => {
+    if (e.target.id !== "skill-form") return;
+    e.preventDefault();
+    const input = e.target.elements.skill;
+    const ten = input.value.trim().replace(/\s+/g, " ");
+    if (!ten) return;
+    if (USER.skills.some((s) => s.toLowerCase() === ten.toLowerCase())) {
+      thongBao("Kỹ năng này đã có trong hồ sơ", "info");
+      return;
+    }
+    luuKyNang(e.target.querySelector("button"), [...USER.skills, ten]);
+  });
+
+  root.addEventListener("change", (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+
+    if (e.target.id === "pick-cv") {
+      if (!/\.(pdf|docx)$/i.test(file.name)) return thongBao("CV phải là file PDF hoặc DOCX", "circle-alert");
+      if (file.size > CV_TOI_DA_MB * 1048576) return thongBao(`CV tối đa ${CV_TOI_DA_MB} MB`, "circle-alert");
+      const box = chon("#cv-box");
+      box.innerHTML = `<div class="cv-empty is-loading-box"><span class="spinner"></span><div><strong>Đang tải và đọc CV…</strong><small>${thoatHtml(file.name)}</small></div></div>`;
+      const fd = new FormData();
+      fd.append("cv", file);
+      thucHien(null, () => Api.goi("POST", "/api/profile/cv", fd)).then(() => {
+        if (box.isConnected && chon(".is-loading-box", box)) box.innerHTML = htmlCv();
+        veIcon();
+      });
+    }
+
+    if (e.target.id === "pick-avatar") {
+      if (!/^image\/(jpeg|png|webp)$/.test(file.type)) return thongBao("Ảnh phải là JPG, PNG hoặc WEBP", "circle-alert");
+      if (file.size > ANH_TOI_DA_MB * 1048576) return thongBao(`Ảnh tối đa ${ANH_TOI_DA_MB} MB`, "circle-alert");
+      const fd = new FormData();
+      fd.append("avatar", file);
+      thucHien(chon(".avatar-edit"), () => Api.goi("POST", "/api/profile/avatar", fd));
+    }
+  });
+
+  veTrang();
+}
+
+/** Popup sửa thông tin hồ sơ. Lỗi validate (422) hiện ngay dưới ô tương ứng. */
+function moFormHoSo(khiLuu) {
+  const truong = [
+    { name: "name", label: "Họ tên", required: true, max: 100 },
+    { name: "school", label: "Trường", max: 150 },
+    { name: "major", label: "Ngành học", max: 150 },
+    { name: "year", label: "Năm học (VD: Sinh viên năm 2)", max: 50 },
+    { name: "location", label: "Khu vực (VD: Quận 1, TP.HCM)", max: 150 },
+    { name: "phone", label: "Số điện thoại", type: "tel", max: 20 },
+  ];
+  const body = chon("#match-overlay-body");
+  body.innerHTML = `
+    <button class="modal-close" type="button" data-close-modal aria-label="Đóng">${htmlIcon("x")}</button>
+    <h2>Chỉnh sửa hồ sơ</h2>
+    <form id="profile-form" class="profile-form" novalidate>
+      ${truong
+        .map(
+          (f) => `<label class="form-field">${f.label}
+            <input type="${f.type || "text"}" name="${f.name}" value="${thoatHtml(USER[f.name] || "")}" maxlength="${f.max}" ${f.required ? "required" : ""}>
+            <span class="form-error" data-error="${f.name}"></span>
+          </label>`
+        )
+        .join("")}
+      <label class="form-field">Giới thiệu bản thân
+        <textarea name="bio" rows="4" maxlength="1000">${thoatHtml(USER.bio || "")}</textarea>
+        <span class="form-error" data-error="bio"></span>
+      </label>
+      <p class="form-error" data-error="_"></p>
+      <button class="btn btn-primary btn-lg" type="submit">Lưu hồ sơ</button>
+    </form>`;
+  chon("#match-overlay").classList.add("is-open");
   veIcon();
+
+  chon("#profile-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const form = e.currentTarget;
+    const btn = form.querySelector("button[type=submit]");
+    chonHet("[data-error]", form).forEach((el) => (el.textContent = ""));
+    btn.disabled = true;
+    btn.classList.add("is-loading");
+    try {
+      const data = await Api.goi("PUT", "/api/profile", Object.fromEntries(new FormData(form)));
+      chon("#match-overlay").classList.remove("is-open");
+      khiLuu(data);
+    } catch (ex) {
+      const keys = Object.keys(ex.errors || {});
+      keys.forEach((k) => {
+        const el = chon(`[data-error="${k}"]`, form);
+        if (el) el.textContent = ex.errors[k][0];
+      });
+      if (!keys.length) chon('[data-error="_"]', form).textContent = ex.message;
+      btn.disabled = false;
+      btn.classList.remove("is-loading");
+    }
+  });
 }
 
 /* ---------- COMPANY ----------

@@ -4183,3 +4183,157 @@ button.is-loading {
 .sidebar-user-row form {
   margin: 0;
 }
+
+/* Trang hồ sơ: đổi ảnh, kỹ năng, CV, form sửa */
+.avatar-edit {
+  position: relative;
+  padding: 0;
+  border-radius: 50%;
+}
+
+.avatar-edit > span {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: #fff;
+  background: var(--primary);
+  border: 3px solid #fff;
+}
+
+.avatar-edit > span svg {
+  width: 15px;
+  height: 15px;
+}
+
+.profile-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.profile-actions form {
+  margin: 0;
+}
+
+.skill-tag.from-cv {
+  background: #e7f8f5;
+}
+
+.skill-remove {
+  margin-left: 2px;
+  padding: 0 4px;
+  font-size: 1.05rem;
+  line-height: 1;
+  color: var(--muted);
+  border-radius: 6px;
+}
+
+.skill-remove:hover {
+  color: var(--danger);
+}
+
+.skill-add {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.skill-add input {
+  flex: 1;
+  min-width: 0;
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  font: inherit;
+}
+
+.cv-empty {
+  display: grid;
+  grid-template-columns: 54px 1fr auto;
+  gap: 14px;
+  align-items: center;
+  padding: 16px;
+  border-radius: 18px;
+  border: 1.5px dashed #d7dbe8;
+}
+
+.cv-empty strong {
+  display: block;
+}
+
+.cv-empty small {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.cv-status {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 12px;
+  font-size: 0.86rem;
+  color: var(--muted);
+}
+
+.cv-status svg {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+}
+
+.cv-status.is-error {
+  color: var(--danger);
+}
+
+.btn.is-danger {
+  color: var(--danger);
+}
+
+.spinner {
+  width: 28px;
+  height: 28px;
+  margin: auto;
+  border-radius: 50%;
+  border: 3px solid rgba(99, 102, 241, 0.2);
+  border-top-color: var(--primary);
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.profile-form {
+  margin-top: 6px;
+}
+
+.profile-form .btn {
+  width: 100%;
+  margin-top: 8px;
+}
+
+#match-overlay .modal:has(.profile-form) {
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+}
+
+@media (max-width: 640px) {
+  .cv-card,
+  .cv-empty {
+    grid-template-columns: 44px 1fr;
+  }
+
+  .cv-card .cv-actions,
+  .cv-empty > .btn {
+    grid-column: 1 / -1;
+    flex-wrap: wrap;
+  }
+}

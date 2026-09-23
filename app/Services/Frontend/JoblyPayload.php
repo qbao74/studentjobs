@@ -7,6 +7,7 @@ use App\Enums\Role;
 use App\Models\Company;
 use App\Models\JobPost;
 use App\Models\Message;
+use App\Models\Skill;
 use App\Models\Student;
 use App\Models\User;
 use App\Services\Matching\RecommendationService;
@@ -52,6 +53,7 @@ class JoblyPayload
             'saved' => [],
             'following' => [],
             'unread' => 0,
+            'skillOptions' => [],
         ];
 
         if (! $student) {
@@ -103,6 +105,7 @@ class JoblyPayload
             'saved' => $student->savedJobs()->pluck('job_posts.id')->all(),
             'following' => $student->followedCompanies()->pluck('companies.slug')->all(),
             'unread' => (int) $applications->sum('unread_count'),
+            'skillOptions' => Skill::orderBy('name')->pluck('name')->all(),
         ];
     }
 

@@ -7,6 +7,7 @@ use App\Models\Application;
 use App\Models\Employer;
 use App\Models\JobPost;
 use App\Models\Message;
+use App\Models\Skill;
 use App\Models\Student;
 use App\Services\Frontend\JoblyPayload;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -28,6 +29,7 @@ class PagePayloadTest extends TestCase
         $this->assertNull($payload['jobs'][0]['match']);
         $this->assertFalse($payload['jobs'][0]['closed']);
         $this->assertNull($payload['user']);
+        $this->assertSame([], $payload['skillOptions']);
     }
 
     public function test_student_payload_contains_real_profile_applications_and_scores(): void
@@ -47,6 +49,7 @@ class PagePayloadTest extends TestCase
         $this->assertSame('current', collect($payload['applications'][0]['steps'])->firstWhere('key', 'interview')['status']);
         $this->assertSame('Mời phỏng vấn', $payload['conversations'][0]['last']);
         $this->assertSame(1, $payload['unread']);
+        $this->assertSame(Skill::orderBy('name')->pluck('name')->all(), $payload['skillOptions']);
     }
 
     public function test_closed_job_still_shown_for_its_applicant(): void
