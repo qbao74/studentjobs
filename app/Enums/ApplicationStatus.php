@@ -23,14 +23,15 @@ enum ApplicationStatus: string
         };
     }
 
-    /** Vị trí trên thanh tiến trình 4 bước: Đã gửi → Đã xem → Phỏng vấn → Kết quả. */
+    /** Vị trí trên thanh tiến trình 5 bước: Ứng tuyển → Đã xem → Shortlist → Phỏng vấn → Kết quả. */
     public function step(): int
     {
         return match ($this) {
             self::Pending => 1,
-            self::Viewed, self::Shortlisted => 2,
-            self::Interview => 3,
-            self::Hired, self::Rejected => 4,
+            self::Viewed => 2,
+            self::Shortlisted => 3,
+            self::Interview => 4,
+            self::Hired, self::Rejected => 5,
         };
     }
 
