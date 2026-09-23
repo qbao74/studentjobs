@@ -9,7 +9,10 @@ Route::middleware('guest')->group(function () {
     Route::post('/login', [LoginController::class, 'store']);
 
     Route::get('/register', [RegisterController::class, 'create'])->name('register');
-    Route::post('/register', [RegisterController::class, 'store']);
+    Route::post('/register', [RegisterController::class, 'store'])->middleware('throttle:10,1')->name('register.store');
+
+    Route::get('/register/employer', [RegisterController::class, 'createEmployer'])->name('register.employer');
+    Route::post('/register/employer', [RegisterController::class, 'store'])->middleware('throttle:10,1')->name('register.employer.store');
 });
 
 Route::post('/logout', [LoginController::class, 'destroy'])
