@@ -9,11 +9,43 @@ use Illuminate\Support\Facades\Hash;
 
 /**
  * Copy từ public/jobly/js/data.js — cùng nội dung, khác cú pháp PHP + tách bảng.
- * Không seed: whyMatch, match, chat, applications, cover, stats.
+ * Tài khoản mẫu (mật khẩu đều là "password"): lebao@student.edu.vn, admin@jobly.vn, hr@<slug-công-ty>.vn.
  */
 class JobPlatformSeeder extends Seeder
 {
     use WithoutModelEvents;
+
+    /** Cách viết khác của kỹ năng — dùng để nhận diện kỹ năng trong CV. */
+    private const ALIASES = [
+        'JavaScript' => ['js', 'javascript', 'es6'],
+        'HTML/CSS' => ['html', 'css', 'html5', 'css3'],
+        'React' => ['reactjs', 'react.js'],
+        'PHP' => ['php'],
+        'Laravel' => ['laravel'],
+        'SQL' => ['sql', 'mysql', 'postgresql', 'sqlite'],
+        'API' => ['rest api', 'restful', 'api'],
+        'Git' => ['git', 'github', 'gitlab'],
+        'Python' => ['python', 'pandas'],
+        'Excel' => ['excel', 'google sheets'],
+        'Dashboard' => ['dashboard', 'power bi', 'looker studio', 'tableau'],
+        'Figma' => ['figma'],
+        'Photoshop' => ['photoshop', 'ps'],
+        'Illustrator' => ['illustrator', 'ai'],
+        'UI/UX' => ['ui/ux', 'ui', 'ux', 'wireframe', 'prototype'],
+        'Canva' => ['canva'],
+        'TikTok' => ['tiktok'],
+        'Instagram' => ['instagram', 'ig'],
+        'Copywriting' => ['copywriting', 'viết content', 'content writing'],
+        'Marketing' => ['marketing', 'digital marketing'],
+    ];
+
+    private ?string $hashedPassword = null;
+
+    /** Băm "password" một lần rồi dùng lại — bcrypt chậm có chủ đích. */
+    private function matKhau(): string
+    {
+        return $this->hashedPassword ??= Hash::make('password');
+    }
 
     /**
      * Laravel bắt buộc tên run() — không đổi.
@@ -25,6 +57,10 @@ class JobPlatformSeeder extends Seeder
         $companies = $this->nhetCongTy($now);
         $studentId = $this->nhetSinhVien($now);
         $this->nhetViecLam($companies, $studentId, $now);
+        $this->nhetQuanTri($now);
+        $this->nhetNhaTuyenDung($companies, $now);
+        $this->nhetSinhVienKhac($now);
+        $this->nhetDonVaTinNhan($studentId, $now);
     }
 
     /** Nhét các công ty từ COMPANIES (data.js) vào bảng companies. */
@@ -155,7 +191,7 @@ class JobPlatformSeeder extends Seeder
             'name' => 'Lê Bảo',
             'email' => 'lebao@student.edu.vn',
             'role' => 'student',
-            'password' => Hash::make('password'),
+            'password' => $this->matKhau(),
             'created_at' => $now,
             'updated_at' => $now,
         ]);
@@ -229,6 +265,7 @@ class JobPlatformSeeder extends Seeder
             ],
             [
                 'id' => 3,
+                'is_remote' => true,
                 'company_slug' => 'storylab',
                 'title' => 'Content Creator',
                 'salary' => '8–12 triệu/tháng',
@@ -349,6 +386,7 @@ class JobPlatformSeeder extends Seeder
             ],
             [
                 'id' => 8,
+                'is_remote' => true,
                 'company_slug' => 'wave-social',
                 'title' => 'Social Media Intern',
                 'salary' => '6–9 triệu/tháng',
@@ -379,6 +417,7 @@ class JobPlatformSeeder extends Seeder
             if (! isset($skillIds[$name])) {
                 $skillIds[$name] = DB::table('skills')->insertGetId([
                     'name' => $name,
+                    'aliases' => json_encode(self::ALIASES[$name] ?? [], JSON_UNESCAPED_UNICODE),
                     'created_at' => $now,
                     'updated_at' => $now,
                 ]);
@@ -405,10 +444,13 @@ class JobPlatformSeeder extends Seeder
 
             DB::table('job_posts')->insert($job);
 
-            foreach ($skillNames as $name) {
+            // Kỹ năng cuối trong danh sách là "điểm cộng", các kỹ năng trước là bắt buộc.
+            $last = array_key_last($skillNames);
+            foreach ($skillNames as $i => $name) {
                 DB::table('job_skill')->insert([
                     'job_post_id' => $job['id'],
                     'skill_id' => $damBaoKyNang($name),
+                    'is_required' => $i !== $last,
                     'created_at' => $now,
                     'updated_at' => $now,
                 ]);
@@ -419,9 +461,158 @@ class JobPlatformSeeder extends Seeder
             DB::table('student_skill')->insert([
                 'student_id' => $studentId,
                 'skill_id' => $skillIds[$name],
+                'source' => 'manual',
                 'created_at' => $now,
                 'updated_at' => $now,
             ]);
+        }
+    }
+
+    /** Tài khoản quản trị: admin@jobly.vn / password. */
+    private function nhetQuanTri(mixed $now): void
+    {
+        DB::table('users')->insert([
+            'name' => 'Quản trị Jobly',
+            'email' => 'admin@jobly.vn',
+            'role' => 'admin',
+            'password' => $this->matKhau(),
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+    }
+
+    /** Mỗi công ty một tài khoản HR: hr@<slug>.vn / password. */
+    private function nhetNhaTuyenDung(array $companies, mixed $now): void
+    {
+        foreach ($companies as $slug => $companyId) {
+            $name = DB::table('companies')->where('id', $companyId)->value('name');
+
+            $userId = DB::table('users')->insertGetId([
+                'name' => 'HR '.$name,
+                'email' => "hr@{$slug}.vn",
+                'role' => 'employer',
+                'password' => $this->matKhau(),
+                'created_at' => $now,
+                'updated_at' => $now,
+            ]);
+
+            DB::table('employers')->insert([
+                'user_id' => $userId,
+                'company_id' => $companyId,
+                'position' => 'Chuyên viên tuyển dụng',
+                'created_at' => $now,
+                'updated_at' => $now,
+            ]);
+        }
+    }
+
+    /** Thêm hai sinh viên để nhà tuyển dụng có nhiều ứng viên khác nhau. */
+    private function nhetSinhVienKhac(mixed $now): void
+    {
+        $people = [
+            [
+                'name' => 'Trần Minh Anh',
+                'email' => 'minhanh@student.edu.vn',
+                'student' => ['school' => 'Đại học Kinh tế', 'major' => 'Hệ thống thông tin', 'year' => 'Sinh viên năm 3', 'bio' => 'Thích phân tích dữ liệu, dùng Excel và SQL hằng ngày.'],
+                'skills' => ['SQL', 'Excel', 'Python'],
+                'apply' => [6 => 'pending', 5 => 'pending'],
+            ],
+            [
+                'name' => 'Phạm Quốc Huy',
+                'email' => 'quochuy@student.edu.vn',
+                'student' => ['school' => 'Đại học Bách Khoa', 'major' => 'Khoa học máy tính', 'year' => 'Sinh viên năm 4', 'bio' => 'Làm backend Laravel hơn một năm qua các dự án môn học.'],
+                'skills' => ['PHP', 'Laravel', 'SQL', 'Git', 'API'],
+                'apply' => [4 => 'shortlisted', 2 => 'rejected'],
+            ],
+        ];
+
+        foreach ($people as $person) {
+            $userId = DB::table('users')->insertGetId([
+                'name' => $person['name'],
+                'email' => $person['email'],
+                'role' => 'student',
+                'password' => $this->matKhau(),
+                'created_at' => $now,
+                'updated_at' => $now,
+            ]);
+
+            $studentId = DB::table('students')->insertGetId($person['student'] + [
+                'user_id' => $userId,
+                'location' => 'TP. Hồ Chí Minh',
+                'created_at' => $now,
+                'updated_at' => $now,
+            ]);
+
+            foreach ($person['skills'] as $name) {
+                DB::table('student_skill')->insert([
+                    'student_id' => $studentId,
+                    'skill_id' => DB::table('skills')->where('name', $name)->value('id'),
+                    'source' => 'manual',
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ]);
+            }
+
+            foreach ($person['apply'] as $jobId => $status) {
+                DB::table('applications')->insert([
+                    'student_id' => $studentId,
+                    'job_post_id' => $jobId,
+                    'status' => $status,
+                    'created_at' => $now->copy()->subDays(3),
+                    'updated_at' => $now,
+                ]);
+            }
+        }
+    }
+
+    /** Đơn và hội thoại của Lê Bảo — giống APPLICATIONS và CONVERSATIONS trong data.js cũ. */
+    private function nhetDonVaTinNhan(int $studentId, mixed $now): void
+    {
+        $studentUserId = DB::table('students')->where('id', $studentId)->value('user_id');
+
+        $applications = [
+            1 => ['status' => 'interview', 'days' => 19, 'messages' => [
+                ['hr', 'Chào Bảo! Cảm ơn bạn đã quan tâm đến vị trí UI/UX Designer.'],
+                ['student', 'Dạ vâng, em đã tìm hiểu thêm về Mây Creative và rất thích cách team làm sản phẩm.'],
+                ['hr', 'Chúng mình muốn mời bạn tham gia một buổi phỏng vấn online. Bạn chọn giúp một khung giờ nhé.'],
+            ]],
+            2 => ['status' => 'shortlisted', 'days' => 16, 'messages' => [
+                ['student', 'Em đã gửi bài test qua email ạ.'],
+                ['hr', 'Cảm ơn bạn đã gửi bài test. Team sẽ phản hồi trong 2 ngày.'],
+            ]],
+            6 => ['status' => 'viewed', 'days' => 15, 'messages' => [
+                ['hr', 'Bạn có thể gửi thêm portfolio dashboard không?'],
+            ]],
+        ];
+
+        foreach ($applications as $jobId => $app) {
+            $created = $now->copy()->subDays($app['days']);
+
+            $applicationId = DB::table('applications')->insertGetId([
+                'student_id' => $studentId,
+                'job_post_id' => $jobId,
+                'status' => $app['status'],
+                'created_at' => $created,
+                'updated_at' => $now,
+            ]);
+
+            $companyId = DB::table('job_posts')->where('id', $jobId)->value('company_id');
+            $hrUserId = DB::table('employers')->where('company_id', $companyId)->value('user_id');
+
+            foreach ($app['messages'] as $i => [$from, $body]) {
+                $sentAt = $created->copy()->addDays(2)->addMinutes($i * 5);
+                $isLast = $i === array_key_last($app['messages']);
+
+                DB::table('messages')->insert([
+                    'application_id' => $applicationId,
+                    'user_id' => $from === 'hr' ? $hrUserId : $studentUserId,
+                    'body' => $body,
+                    // Tin cuối của HR để chưa đọc, sinh viên sẽ thấy badge.
+                    'read_at' => ($from === 'hr' && $isLast) ? null : $sentAt,
+                    'created_at' => $sentAt,
+                    'updated_at' => $sentAt,
+                ]);
+            }
         }
     }
 }
