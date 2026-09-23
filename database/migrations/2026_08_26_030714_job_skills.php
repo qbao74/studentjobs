@@ -15,6 +15,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('job_post_id')->constrained('job_posts')->cascadeOnDelete();
             $table->foreignId('skill_id')->constrained()->cascadeOnDelete();
+            $table->boolean('is_required')->default(true);
             $table->timestamps();
         });
     }
