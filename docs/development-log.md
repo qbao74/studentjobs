@@ -1089,4 +1089,166 @@ POST `/api/applications/7/messages` → `auth` → `Gate::authorize('message', $
 Cần kiểm tra:
 - Muốn realtime thật: thay polling bằng Laravel Reverb/Echo, API giữ nguyên.
 
+---
+
+# PHASE 07 — Frontend sinh viên bỏ dữ liệu giả
+
+Trước phase này `public/jobly/js/data.js` chứa dữ liệu giả, còn lưu việc, ứng tuyển, theo dõi đều nằm trong localStorage. Giờ:
+
+```
+Server (JoblyPayload) ──in vào layout──► window.JOBLY ──data.js đặt tên ngắn──► USER, JOBS, COMPANIES, APPLICATIONS, CONVERSATIONS
+Bấm nút ──► Api.goi() (auth.js) ──► /api/... ──► JSON ──► cập nhật biến + vẽ lại
+Khách bấm nút cần đăng nhập ──► Popup.moDangNhap({ viecCho }) ──► đăng nhập ──► tải lại trang ──► chayViecCho() làm tiếp
+```
+
+## Commit: 2cc036a
+
+### Tiêu đề
+feat: Thêm lớp gọi API và popup đăng nhập ngay trên trang
+
+### Ngày
+2026-09-23
+
+### Mục đích
+Khách xem việc thoải mái, chỉ bị hỏi đăng nhập khi bấm ứng tuyển / lưu / vào mục cá nhân, và đăng nhập ngay trong popup, không rời trang.
+
+### Đã làm
+- `public/jobly/js/auth.js` (mới):
+  - `Api.goi(method, url, body)`: tự gắn CSRF, gửi JSON hoặc `FormData`. Lỗi được đổi thành `LoiApi` (status, message, errors): 401 thì mở popup, 419 là phiên hết hạn, 429 là thao tác quá nhanh, 422 lấy lỗi validate đầu tiên.
+  - `Popup`: hai tab Đăng nhập / Tạo tài khoản, gửi JSON tới `/login` và `/register`.
+  - `ViecCho`: lưu việc đang làm dở (VD: `{type: "apply", jobId: 8}`) vào `sessionStorage` trước khi tải lại trang.
+- `LoginController`, `RegisterController`: request `expectsJson()` thì trả `{ role, redirect }` thay vì redirect. Tài khoản không phải sinh viên được chuyển về khu của mình.
+- CSS mục "21 AUTH POPUP".
+
+### Luồng code
+Khách bấm "Nhận" → `canDangNhap(lyDo, {type:"apply", jobId})` → `Popup.moDangNhap` → POST `/login` (JSON) → `LoginRequest` (throttle, chặn tài khoản bị khóa) → 200 `{role:"student"}` → `location.reload()`.
+
+### File quan trọng
+- `public/jobly/js/auth.js`
+- `app/Http/Controllers/Auth/LoginController.php`, `RegisterController.php`
+- `tests/Feature/Auth/LoginTest.php`, `RegisterTest.php` (3 test cho nhánh JSON)
+
+### Kiến thức cần nhớ
+- Cùng một route vừa phục vụ form thường, vừa phục vụ popup: `$request->expectsJson()` dựa vào header `Accept: application/json`.
+- Sau khi đăng nhập, Laravel tạo session mới và CSRF token mới. Vì vậy popup tải lại trang thay vì tiếp tục dùng token cũ.
+
+### Nếu muốn sửa chức năng này
+Cần kiểm tra:
+- Thêm loại việc chờ mới: đặt `viecCho: {type: "..."}` ở chỗ gọi, rồi xử lý `type` đó trong `chayViecCho()` (app.js).
+- Đổi nội dung popup: `Popup.dungKhung()`.
+
+## Commit: 465b8a9
+
+### Tiêu đề
+feat: Chuyển giao diện sinh viên sang dữ liệu thật từ server
+
+### Ngày
+2026-09-23
+
+### Mục đích
+Bỏ hoàn toàn dữ liệu giả. Mọi con số, tên, điểm khớp, thông báo trên trang đều lấy từ DB.
+
+### Đã làm
+- `data.js` viết lại: chỉ đọc `window.JOBLY`, thêm `napLaiDuLieu(state)`, `viecGoiY()` (sinh viên: điểm cao nhất, khách: tin mới nhất), `anhDaiDien()` (không có ảnh thì dùng ô chữ cái đầu).
+- `Kho` (app.js): lưu việc, theo dõi, ứng tuyển gọi API. Riêng "bỏ qua" vẫn để localStorage, tách key theo từng tài khoản.
+- Khách: sidebar có nút Đăng nhập / Tạo tài khoản. Các mục Đã lưu, Đã apply, Tin nhắn, Hồ sơ có `data-auth-link`, bấm vào sẽ mở popup. Nút điểm khớp đổi thành "Xem độ phù hợp".
+- Modal và trang chi tiết hiện điểm từng tiêu chí (`breakdown`) bằng thanh ngang, cùng ưu/nhược điểm và nhận xét (`htmlGiaiThich`).
+- Bỏ các id viết cứng (`[2,3,5]`...): gợi ý tính theo điểm; "Việc tương tự" tính theo số kỹ năng chung.
+- Home: lời chào theo tên thật (Blade), hộp thông báo dựng từ đơn đã được xử lý, số tin chưa đọc và số việc khớp từ 80% trở lên.
+- Ứng tuyển: `ungTuyenViec()` gọi API. Khách vuốt lên thì thẻ được vẽ lại và popup mở ra. 409 (đã nộp) → trang tiến trình.
+- Trang `/match` chỉ chúc mừng khi đơn có thật. Bỏ các câu hứa hẹn không có thật ("AI đã đính kèm tóm tắt", "phản hồi trong 2–3 ngày").
+- Trang tiến trình: đơn thật, ngày nộp, nút "Rút đơn" (khi `canWithdraw`), trạng thái rỗng, CSS `.t-step.is-rejected`.
+- Trang công ty: theo dõi qua API. Bỏ tab và ô "Đánh giá" vì hệ thống không có chức năng đánh giá. Id không tồn tại thì hiện trạng thái rỗng, không còn lấy công ty đầu tiên.
+- `StudentPresenter` thêm `closed`: tin đã đóng khóa nút ứng tuyển.
+- Layout: nút đăng xuất chuyển vào sidebar; CSS/JS có `?v=<thời gian sửa file>` để trình duyệt không dùng bản cũ.
+
+### Luồng code
+Mở `/` → `JoblyPayload::build(user)` → `window.JOBLY` → `data.js` → `veKhung()` (sidebar theo vai trò) → `khoiTrangHome()` → `viecChoChongThe()` (bỏ việc đã nộp/bỏ qua, xếp theo điểm) → `BoVuot`.
+
+### File quan trọng
+- `public/jobly/js/data.js`, `public/jobly/js/app.js`
+- `app/Services/Frontend/StudentPresenter.php`
+- `resources/views/home.blade.php`, `resources/views/layout/app.blade.php`
+- `tests/Feature/Student/PagePayloadTest.php`
+
+### Kiến thức cần nhớ
+- Mọi text từ DB đưa vào `innerHTML` phải qua `thoatHtml()`. Riêng `window.JOBLY` dùng `@json` (tự thoát `</script>`).
+- `match == null` có hai nghĩa: khách (chưa đăng nhập) hoặc sinh viên mà tin chưa được tính điểm. Giao diện phải xử lý cả hai trường hợp.
+- `chayViecCho()` chỉ chấp nhận đường dẫn nội bộ bắt đầu bằng `/` để không bị lợi dụng chuyển hướng ra trang ngoài.
+
+### Nếu muốn sửa chức năng này
+Cần kiểm tra:
+- Thêm trường mới cho job: `StudentPresenter::job()` rồi dùng trong `ruotTheViec()` / `hangViec()`.
+- Đổi ngưỡng màu điểm khớp: `mucDoKhop()` trong data.js (đang khớp với `config/matching.php`).
+
+## Commit: c331c0d
+
+### Tiêu đề
+feat: Trang hồ sơ sửa được thông tin, kỹ năng, ảnh đại diện và CV
+
+### Ngày
+2026-09-23
+
+### Mục đích
+Nút "Chỉnh sửa", "Thêm kỹ năng", "Cập nhật CV" trước đây chỉ hiện toast. Giờ đều lưu thật.
+
+### Đã làm
+- Popup sửa hồ sơ (`moFormHoSo`): lỗi 422 hiện dưới đúng ô nhập.
+- Kỹ năng: xóa (×), thêm kèm gợi ý từ danh mục (`<datalist>` từ `JOBLY.skillOptions`). Kỹ năng đọc từ CV có biểu tượng file riêng.
+- Ảnh đại diện: bấm vào ảnh để chọn file; kiểm tra định dạng và dung lượng ở trình duyệt trước khi gửi.
+- CV: tải lên (có trạng thái "Đang tải và đọc CV…"), xem/tải về, thay, xóa. Hiện kỹ năng AI đọc được, hoặc lỗi nếu không đọc được nội dung.
+- Rail: điểm hồ sơ và danh sách mục còn thiếu lấy từ `profileMissing` (server tính).
+- Nút đăng xuất trong trang hồ sơ (trên mobile không có sidebar).
+- Payload thêm `skillOptions`; thời gian CV mới tải hiện "Vừa xong".
+
+### Luồng code
+Thêm "laravel" → PUT `/api/profile/skills` `{skills:[...cũ, "laravel"]}` → `ProfileService::syncSkills` (dùng lại "Laravel" có sẵn, không phân biệt hoa thường) → `ProfileRefresher` tính lại điểm hồ sơ + điểm khớp → `{message, state}` → `napLaiDuLieu(state)` → vẽ lại trang và sidebar. Thử trên trình duyệt: tin Backend tăng từ 59% lên 76%.
+
+### File quan trọng
+- `public/jobly/js/app.js` (mục PROFILE: `khoiTrangHoSo`, `moFormHoSo`)
+- `app/Services/Frontend/JoblyPayload.php`
+
+### Kiến thức cần nhớ
+- API trả toàn bộ `state` sau mỗi thay đổi hồ sơ, vì điểm khớp của mọi tin đều có thể đổi theo. JS không phải tự tính lại gì.
+- Kiểm tra file ở trình duyệt chỉ giúp báo lỗi nhanh hơn. Server vẫn phải validate lại, vì request có thể được gửi thẳng mà không qua giao diện.
+
+### Nếu muốn sửa chức năng này
+Cần kiểm tra:
+- Thêm trường hồ sơ: `UpdateProfileRequest` (rule), `ProfileService::update` (only), `StudentPresenter::user`, mảng `truong` trong `moFormHoSo`.
+
+## Commit: ce83a09
+
+### Tiêu đề
+feat: Chat với nhà tuyển dụng dùng tin nhắn thật và tự cập nhật tin mới
+
+### Ngày
+2026-09-23
+
+### Mục đích
+Bỏ chat giả (tin dựng sẵn, tự trả lời sau 1,1 giây, nút gọi, ảnh và file giả).
+
+### Đã làm
+- Mở hội thoại → GET `/api/applications/{id}/messages` (có trạng thái đang tải / lỗi + nút thử lại / trống).
+- Cứ 5 giây hỏi lại với `?after=<id tin cuối>`, chỉ khi tab đang hiển thị (`visibilityState`).
+- Gửi: hiện bong bóng "Đang gửi…" trước, thành công thì thay bằng tin thật, lỗi thì viền đỏ và trả lại chữ vào ô nhập.
+- Tách ngày ("Hôm nay", "Hôm qua", dd/mm/yyyy). Mở hội thoại thì giảm badge "Tin nhắn" trên menu.
+- Cột thông tin: trạng thái đơn thật, CV hiện tại trong hồ sơ. Màu hội thoại vẫn lưu localStorage, tách theo tài khoản.
+- `chat.blade.php`: bỏ nút gọi thoại/video, gợi ý trả lời, đính kèm, emoji; sửa link chết `company.html`.
+
+### Luồng code
+Gõ tin → `guiTin()` → thêm bong bóng tạm → POST `/api/applications/7/messages` → `Gate('message')` → `MessageService::send` → 201 `{message}` → thay bong bóng tạm. Nhà tuyển dụng trả lời → lần hỏi tiếp theo GET `?after=` → thêm vào luồng.
+
+### File quan trọng
+- `public/jobly/js/app.js` (mục CHAT: `khoiTrangChat`)
+- `resources/views/chat.blade.php`
+
+### Kiến thức cần nhớ
+- Lần hỏi định kỳ có thể mang tin mình vừa gửi về trước khi POST trả lời. Vì vậy khi thay bong bóng tạm phải kiểm tra id đã có chưa, không thì tin bị hiện hai lần.
+- Thời gian ở danh sách hội thoại (`conv.time`) do server tính theo ngày; tin nhắn chỉ có giờ (`H:i`). Không được lấy giờ của tin cũ ghi đè lên.
+
+### Nếu muốn sửa chức năng này
+Cần kiểm tra:
+- Đổi tần suất hỏi: hằng `CHAT_HOI_LAI_MS`.
+- Chuyển sang realtime: thay `setInterval` bằng Echo lắng nghe kênh riêng của đơn; phần vẽ (`veLuongTin`) giữ nguyên.
+
 <!-- mục-tiếp-theo -->
