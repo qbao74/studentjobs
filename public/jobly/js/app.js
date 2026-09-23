@@ -175,9 +175,13 @@ function chaySo(el, target, suffix = "") {
   requestAnimationFrame(tick);
 }
 
-/** HTML vòng tròn % (AI score). CSS --p điều khiển stroke; data-score để chayVongDiem đọc. */
+/** HTML vòng tròn % (kiểu pin). CSS --p điều khiển cung; data-score để chayVongDiem đọc. */
 function vongDiem(value, id = "") {
   return `<div class="score-ring" ${id ? `id="${id}"` : ""} style="--p:0" data-score="${value}">
+    <svg viewBox="0 0 36 36" aria-hidden="true">
+      <circle class="score-track" cx="18" cy="18" r="15.5"></circle>
+      <circle class="score-arc" cx="18" cy="18" r="15.5"></circle>
+    </svg>
     <strong>0%</strong>
   </div>`;
 }

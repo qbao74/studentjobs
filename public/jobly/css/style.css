@@ -1129,30 +1129,61 @@ body:not([data-page="chat"]) .app:not(.has-rail) .main {
   color: var(--muted);
 }
 
-/* Score ring (AI match / profile score) */
-.score-ring {
-  --p: 0;
-  width: 96px;
-  height: 96px;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  background: conic-gradient(var(--primary) calc(var(--p) * 1%), rgba(99, 102, 241, 0.12) 0);
-  transition: --p 1s;
-  position: relative;
+/* Vòng % kiểu pin: SVG tròn cố định, không bị flex bóp thành oval.
+   --p = 0..100. Chu vi r=15.5 là 2πr ≈ 97.389. */
+@property --p {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
 }
 
-.score-ring::before {
-  content: "";
+.score-ring {
+  --p: 0;
+  position: relative;
+  width: 84px;
+  height: 84px;
+  min-width: 84px;
+  min-height: 84px;
+  aspect-ratio: 1;
+  flex: 0 0 84px;
+  display: grid;
+  place-items: center;
+}
+
+.score-ring svg {
   position: absolute;
-  inset: 8px;
-  border-radius: 50%;
-  background: #fff;
+  inset: 0;
+  width: 84px;
+  height: 84px;
+  transform: rotate(-90deg);
+}
+
+.score-ring .score-track,
+.score-ring .score-arc {
+  fill: none;
+  stroke-width: 3.2;
+}
+
+.score-ring .score-track {
+  stroke: rgba(99, 102, 241, 0.16);
+}
+
+.score-ring .score-arc {
+  stroke: var(--primary);
+  stroke-linecap: round;
+  stroke-dasharray: 97.389;
+  stroke-dashoffset: calc(97.389 * (1 - var(--p) / 100));
+  transition: stroke-dashoffset 0.9s var(--ease);
+}
+
+.score-ring[data-score="0"] .score-arc {
+  stroke-linecap: butt;
 }
 
 .score-ring strong {
   position: relative;
-  font-size: 1.35rem;
+  z-index: 1;
+  font-size: 1.15rem;
   font-weight: 800;
   letter-spacing: -0.03em;
   color: var(--primary-dark);
