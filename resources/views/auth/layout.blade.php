@@ -5,7 +5,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>@yield('title') — Jobly</title>
-    <link rel="stylesheet" href="{{ asset('jobly/css/style.css') }}" />
+    <link rel="stylesheet" href="{{ asset('jobly/css/style.css') }}?v={{ filemtime(public_path('jobly/css/style.css')) }}" />
     <style>
         .auth-wrap { min-height: 100vh; display: grid; place-items: center; padding: 24px; }
         .auth-card { width: min(440px, 100%); padding: 28px; }

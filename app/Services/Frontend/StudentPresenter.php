@@ -2,6 +2,7 @@
 
 namespace App\Services\Frontend;
 
+use App\Enums\JobStatus;
 use App\Models\Application;
 use App\Models\Company;
 use App\Models\JobPost;
@@ -44,6 +45,7 @@ class StudentPresenter
             'requirements' => $job->requirements ?? [],
             'benefits' => $job->benefits ?? [],
             'postedAt' => $job->created_at?->toDateString(),
+            'closed' => $job->status !== JobStatus::Open,
             'match' => $rec?->score,
             'whyMatch' => $rec ? [
                 'pros' => $rec->pros ?? [],

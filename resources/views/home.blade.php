@@ -6,8 +6,13 @@
 @section('content')
   <header class="page-head">
     <div>
-      <h1 class="page-title">Chào Bảo! <span class="wave">👋</span></h1>
-      <p class="page-sub">Đây là những công việc phù hợp với bạn dựa trên CV.</p>
+      @auth
+        <h1 class="page-title">Chào {{ \Illuminate\Support\Str::afterLast(trim(auth()->user()->name), ' ') }}! <span class="wave">👋</span></h1>
+        <p class="page-sub">Đây là những công việc phù hợp với bạn dựa trên CV.</p>
+      @else
+        <h1 class="page-title">Chào bạn! <span class="wave">👋</span></h1>
+        <p class="page-sub">Việc làm thêm mới nhất cho sinh viên. Đăng nhập để AI xếp theo độ phù hợp với CV.</p>
+      @endauth
     </div>
     <div class="head-tools">
       <form class="search-bar" action="{{ url('/explore') }}" method="get">
@@ -18,12 +23,7 @@
         <i data-lucide="bell"></i>
         <span class="notify-dot"></span>
       </button>
-      <div class="notify-pop" id="notify-pop" hidden>
-        <p><strong>Mây Creative</strong> đã xem CV của bạn</p>
-        <p><strong>TechWind</strong> mời bạn phỏng vấn Thứ 3</p>
-        <p>AI tìm thấy 3 việc mới phù hợp 92%+</p>
-        <a href="{{ url('/chat') }}">Mở tin nhắn →</a>
-      </div>
+      <div class="notify-pop" id="notify-pop" hidden></div>
     </div>
   </header>
 

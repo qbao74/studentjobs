@@ -9,70 +9,60 @@
  */
 /* =========================================================
    1. STORE
-   Lớp mỏng trên localStorage. Mỗi key là mảng id (job hoặc company).
-   Set dùng để không lưu trùng. Sau này thay bằng API + session user.
+   Đơn, việc đã lưu, công ty theo dõi: nằm trên server (JOBLY + API).
+   Riêng "bỏ qua" chỉ là lựa chọn hiển thị nên để localStorage, tách theo từng tài khoản.
    ========================================================= */
 const Kho = {
-  key: {
-    applied: "jobly_applied",
-    skipped: "jobly_skipped",
-    saved: "jobly_saved",
-    followed: "jobly_followed",
+  /** Key localStorage của danh sách bỏ qua — mỗi tài khoản (hoặc khách) một key riêng. */
+  keyBo() {
+    return `jobly_skipped_${USER?.id ?? "guest"}`;
   },
-  /** Đọc mảng JSON; lỗi parse → [] để UI không vỡ */
-  doc(key) {
+  /** Danh sách job id đã ứng tuyển (theo đơn thật). */
+  daUngTuyen() {
+    return APPLICATIONS.map((a) => a.jobId);
+  },
+  /** Danh sách job id đã bỏ qua. Lỗi parse → [] để UI không vỡ. */
+  daBo() {
     try {
-      return JSON.parse(localStorage.getItem(key) || "[]");
+      return JSON.parse(localStorage.getItem(this.keyBo()) || "[]");
     } catch {
       return [];
     }
   },
-  /** Ghi mảng id vào localStorage. */
-  ghi(key, value) {
-    localStorage.setItem(key, JSON.stringify(value));
-  },
-  /** Danh sách job id đã ứng tuyển. */
-  daUngTuyen() {
-    return this.doc(this.key.applied);
-  },
-  /** Danh sách job id đã bỏ qua. */
-  daBo() {
-    return this.doc(this.key.skipped);
-  },
-  /** Danh sách job id đã lưu (tim). */
-  daLuu() {
-    return this.doc(this.key.saved);
-  },
-  /** Thêm job vào danh sách đã ứng tuyển. */
-  themUngTuyen(id) {
-    this.ghi(this.key.applied, [...new Set([...this.daUngTuyen(), Number(id)])]);
-  },
   /** Thêm job vào danh sách đã bỏ qua. */
   themBo(id) {
-    this.ghi(this.key.skipped, [...new Set([...this.daBo(), Number(id)])]);
+    localStorage.setItem(this.keyBo(), JSON.stringify([...new Set([...this.daBo(), Number(id)])]));
   },
-  /** Bật/tắt lưu job; trả về true nếu sau thao tác job đang được lưu */
-  daoLuu(id) {
-    const ids = new Set(this.daLuu());
-    const n = Number(id);
-    ids.has(n) ? ids.delete(n) : ids.add(n);
-    this.ghi(this.key.saved, [...ids]);
-    return ids.has(n);
+  /** Xóa danh sách bỏ qua để xem lại từ đầu. */
+  xoaBo() {
+    localStorage.removeItem(this.keyBo());
   },
   /** Job này đang được lưu hay chưa. */
   dangLuu(id) {
-    return this.daLuu().includes(Number(id));
+    return JOBLY.saved.includes(Number(id));
   },
-  /** Bật/tắt theo dõi công ty; trả về true nếu đang theo dõi. */
-  daoTheoDoi(companyId) {
-    const ids = new Set(this.doc(this.key.followed));
-    ids.has(companyId) ? ids.delete(companyId) : ids.add(companyId);
-    this.ghi(this.key.followed, [...ids]);
-    return ids.has(companyId);
+  /** Bật/tắt lưu job qua API; trả về trạng thái mới (true = đang lưu). */
+  async daoLuu(id) {
+    const n = Number(id);
+    const data = await Api.goi("POST", `/api/jobs/${n}/save`);
+    JOBLY.saved = data.saved ? [...JOBLY.saved, n] : JOBLY.saved.filter((x) => x !== n);
+    return data.saved;
   },
   /** Đang theo dõi công ty này hay chưa. */
-  dangTheoDoi(companyId) {
-    return this.doc(this.key.followed).includes(companyId);
+  dangTheoDoi(slug) {
+    return JOBLY.following.includes(slug);
+  },
+  /** Bật/tắt theo dõi công ty qua API; trả về { following, followers }. */
+  async daoTheoDoi(slug) {
+    const data = await Api.goi("POST", `/api/companies/${encodeURIComponent(slug)}/follow`);
+    JOBLY.following = data.following ? [...JOBLY.following, slug] : JOBLY.following.filter((x) => x !== slug);
+    return data;
+  },
+  /** Ứng tuyển qua API, thêm đơn mới vào APPLICATIONS rồi trả về đơn đó. */
+  async ungTuyen(id) {
+    const data = await Api.goi("POST", `/api/jobs/${Number(id)}/apply`);
+    APPLICATIONS.unshift(data.application);
+    return data.application;
   },
 };
 
@@ -80,14 +70,15 @@ const Kho = {
    2. HELPERS
    NAV / MOBILE_NAV: menu desktop vs 5 tab dưới mobile.
    qs/qsa/param: rút gọn DOM + query string.
-   thoatHtml: bắt buộc khi nhét text user/mock vào innerHTML.
+   thoatHtml: bắt buộc khi nhét text người dùng nhập vào innerHTML.
+   auth: true = mục cần đăng nhập; khách bấm vào sẽ mở popup thay vì chuyển trang.
    ========================================================= */
 const NAV = [
   { id: "home", href: "/", label: "Home", icon: "house" },
   { id: "explore", href: "/explore", label: "Khám phá", icon: "compass" },
-  { id: "saved", href: "/explore?saved=1", label: "Đã lưu", icon: "heart" },
-  { id: "applications", href: "/applications", label: "Đã apply", icon: "circle-check-big" },
-  { id: "chat", href: "/chat", label: "Tin nhắn", icon: "message-circle", badge: 3 },
+  { id: "saved", href: "/explore?saved=1", label: "Đã lưu", icon: "heart", auth: true },
+  { id: "applications", href: "/applications", label: "Đã apply", icon: "circle-check-big", auth: true },
+  { id: "chat", href: "/chat", label: "Tin nhắn", icon: "message-circle", auth: true, badge: JOBLY.unread },
 ];
 
 // Bottom nav mobile: Home, Explore, Applications, Chat, Profile (không có mục Saved riêng)
@@ -96,8 +87,11 @@ const MOBILE_NAV = [
   NAV[1],
   NAV[3],
   NAV[4],
-  { id: "profile", href: "/profile", label: "Hồ sơ", icon: "user-round" },
+  { id: "profile", href: "/profile", label: "Hồ sơ", icon: "user-round", auth: true },
 ];
+
+/** Thuộc tính cho link cần đăng nhập — ganClickToanTrang bắt data-auth-link. */
+const thuocTinhLink = (n) => (n.auth && !laSinhVien() ? `data-auth-link="${n.href}"` : "");
 
 /** Chọn 1 phần tử DOM (gọn hơn querySelector). */
 const chon = (sel, root = document) => root.querySelector(sel);
@@ -128,11 +122,21 @@ function htmlLogo(company, cls = "") {
   return `<div class="company-logo ${cls}" style="background:${c.color}">${c.initial}</div>`;
 }
 
-/** Nút % phù hợp; data-open-match mở modal AI (ganClickToanTrang) */
+/** Nút % phù hợp; data-open-match mở modal AI (ganClickToanTrang). Chưa có điểm (khách) → mời đăng nhập. */
 function vienKhop(job, extra = "") {
+  if (job.match == null) {
+    return `<button class="match-pill ${extra}" type="button" data-tone="mid" data-open-match="${job.id}">
+      ${htmlIcon("sparkles")} ${laSinhVien() ? "Đang tính điểm" : "Xem độ phù hợp"}
+    </button>`;
+  }
   return `<button class="match-pill ${extra}" type="button" data-tone="${mucDoKhop(job.match)}" data-open-match="${job.id}">
     ${htmlIcon("thumbs-up")} ${job.match}% phù hợp
   </button>`;
+}
+
+/** Nhãn % nhỏ (không bấm được) cho danh sách gợi ý; không có điểm thì không hiện. */
+function nhanKhop(job, suffix = "") {
+  return job.match == null ? "" : `<span class="match-pill" data-tone="${mucDoKhop(job.match)}">${job.match}%${suffix}</span>`;
 }
 
 /** Dấu tick xanh nếu công ty đã xác thực. */
@@ -218,12 +222,43 @@ function veKhung() {
       <nav class="nav-list">
         ${NAV.map(
           (n) => `
-          <a class="nav-item ${n.id === active ? "is-active" : ""}" href="${n.href}">
+          <a class="nav-item ${n.id === active ? "is-active" : ""}" href="${n.href}" ${thuocTinhLink(n)}>
             ${htmlIcon(n.icon)}${n.label}
             ${n.badge ? `<span class="nav-badge">${n.badge}</span>` : ""}
           </a>`
         ).join("")}
       </nav>
+      ${USER ? theAISidebar() : theKhachSidebar()}`;
+    // Animate thanh progress sau khi DOM gắn (width 0 → data-w)
+    requestAnimationFrame(() =>
+      chonHet(".progress-bar span[data-w]").forEach((s) => (s.style.width = `${s.dataset.w}%`))
+    );
+  }
+
+  if (bottom) {
+    bottom.innerHTML = MOBILE_NAV.map(
+      (n) => `<a class="${n.id === active ? "is-active" : ""}" href="${n.href}" ${thuocTinhLink(n)}>${htmlIcon(n.icon)}${n.label}</a>`
+    ).join("");
+  }
+  veRailVaOverlay();
+}
+
+/** Khối cuối sidebar cho khách: giới thiệu + nút đăng nhập / đăng ký (mở popup). */
+function theKhachSidebar() {
+  return `
+      <div class="ai-card">
+        <div class="ai-card-head"><strong>${htmlIcon("sparkles")} Jobly cho sinh viên</strong></div>
+        <p>Tải CV lên để AI chấm độ phù hợp với từng công việc.</p>
+        <div class="guest-actions">
+          <button class="btn btn-primary btn-sm" type="button" data-open-auth="login">Đăng nhập</button>
+          <button class="btn btn-ghost btn-sm" type="button" data-open-auth="register">Tạo tài khoản</button>
+        </div>
+      </div>`;
+}
+
+/** Khối cuối sidebar cho sinh viên: điểm hồ sơ + tên + nút đăng xuất. */
+function theAISidebar() {
+  return `
       <div class="ai-card">
         <div class="ai-card-head">
           <span class="ai-bot">
@@ -237,31 +272,26 @@ function veKhung() {
           </span>
           <strong>AI Career Assistant</strong>
         </div>
-        <p>AI đang tìm việc phù hợp với bạn...</p>
+        <p>${USER.cv ? "Điểm hồ sơ càng cao, gợi ý càng chính xác." : "Tải CV lên để AI hiểu kỹ năng của bạn."}</p>
         <div class="ai-progress">
-          <div class="ai-progress-label"><span>CV Match Profile</span><span>${USER.profileScore}%</span></div>
+          <div class="ai-progress-label"><span>Điểm hồ sơ</span><span>${USER.profileScore}%</span></div>
           <div class="progress-bar"><span data-w="${USER.profileScore}"></span></div>
         </div>
       </div>
       <div class="sidebar-user-row">
         <a class="sidebar-user" href="/profile">
-          <img class="avatar" src="${USER.avatar}" alt="${USER.name}">
-          <div><strong>${USER.name}</strong><span>${USER.year}</span></div>
+          <img class="avatar" src="${anhDaiDien(USER)}" alt="">
+          <div><strong>${thoatHtml(USER.name)}</strong><span>${thoatHtml(USER.year || USER.school || "Sinh viên")}</span></div>
         </a>
-        <a class="icon-btn icon-btn--ghost" href="/profile" aria-label="Cài đặt">${htmlIcon("settings")}</a>
+        <form method="POST" action="/logout">
+          <input type="hidden" name="_token" value="${Api.token()}">
+          <button class="icon-btn icon-btn--ghost" type="submit" aria-label="Đăng xuất" title="Đăng xuất">${htmlIcon("log-out")}</button>
+        </form>
       </div>`;
-    // Animate thanh progress sau khi DOM gắn (width 0 → data-w)
-    requestAnimationFrame(() =>
-      chonHet(".progress-bar span[data-w]").forEach((s) => (s.style.width = `${s.dataset.w}%`))
-    );
-  }
+}
 
-  if (bottom) {
-    bottom.innerHTML = MOBILE_NAV.map(
-      (n) => `<a class="${n.id === active ? "is-active" : ""}" href="${n.href}">${htmlIcon(n.icon)}${n.label}</a>`
-    ).join("");
-  }
-
+/** Rail → bottom sheet trên màn hình hẹp + overlay AI match dùng chung. */
+function veRailVaOverlay() {
   // Rail → bottom sheet trên màn hình hẹp (FAB sparkles + backdrop)
   const rail = chon("#rail");
   if (rail) {
@@ -299,16 +329,26 @@ function veKhung() {
 const CotPhai = {
   /** Thẻ AI Career Assistant trên cột phải. */
   hoSoAI() {
+    if (!USER) {
+      return `
+      <div class="ai-profile-card">
+        <h3>${htmlIcon("sparkles")} AI chấm độ phù hợp</h3>
+        <p>Đăng nhập và tải CV lên để biết bạn hợp với việc nào, còn thiếu kỹ năng gì.</p>
+        <button class="btn" type="button" data-open-auth="register">Tạo tài khoản ${htmlIcon("arrow-right")}</button>
+      </div>`;
+    }
+    const goiY = USER.profileMissing[0];
     return `
       <div class="ai-profile-card">
         <h3>${htmlIcon("sparkles")} Tối ưu hồ sơ của bạn</h3>
-        <p>Cập nhật thêm kỹ năng để nhận được nhiều công việc phù hợp hơn.</p>
+        <p>${goiY ? `Gợi ý: ${thoatHtml(goiY)}.` : "Hồ sơ đã đầy đủ. Cập nhật kỹ năng mới khi bạn học thêm."}</p>
         <a class="btn" href="/profile">Cải thiện hồ sơ ${htmlIcon("arrow-right")}</a>
       </div>`;
   },
 
-  /** 4 ô số: apply / phỏng vấn / hired / match. */
+  /** 4 ô số: apply / phỏng vấn / hired / match. Khách không có số liệu → bỏ khối. */
   thongKeNhanh() {
+    if (!USER) return "";
     const s = USER.stats;
     return `
       <section>
@@ -322,12 +362,9 @@ const CotPhai = {
       </section>`;
   },
 
-  /** 3 job gợi ý; ids mặc định [2,3,5]; excludeId để ẩn job đang xem */
-  viecGoiY(title = "Gợi ý hôm nay", excludeId = null, ids = [2, 3, 5]) {
-    const list = ids
-      .map(layViecTheoId)
-      .filter((j) => j && j.id !== excludeId)
-      .slice(0, 3);
+  /** 3 job gợi ý (điểm cao nhất, hoặc mới nhất với khách); excludeId để ẩn job đang xem. list tự truyền nếu cần. */
+  viecGoiY(title = "Gợi ý hôm nay", excludeId = null, list = viecGoiY(3, excludeId)) {
+    if (!list.length) return "";
     return `
       <section>
         <h3 class="rail-title">${title}</h3>
@@ -342,7 +379,7 @@ const CotPhai = {
                   <strong>${thoatHtml(job.title)}</strong>
                   <small>${thoatHtml(job.company)} · ${thoatHtml(job.salary)}</small>
                 </div>
-                <span class="match-pill" data-tone="${mucDoKhop(job.match)}">${job.match}%</span>
+                ${nhanKhop(job)}
               </a>`;
             })
             .join("")}
@@ -361,8 +398,16 @@ const CotPhai = {
       </div>`;
   },
 
-  /** Khối AI Match trên trang chi tiết: vòng %, ưu/nhược, comment */
+  /** Khối AI Match trên trang chi tiết: vòng %, điểm từng tiêu chí, ưu/nhược, nhận xét. */
   khopAI(job) {
+    if (job.match == null) {
+      return `
+      <div class="card section ai-match-card" style="margin-top:0">
+        <strong class="title">${htmlIcon("sparkles")} AI Match</strong>
+        <p class="muted">${laSinhVien() ? "Hệ thống đang tính điểm cho tin này, hãy tải lại trang sau ít phút." : "Đăng nhập để xem bạn hợp với việc này bao nhiêu phần trăm và còn thiếu gì."}</p>
+        ${laSinhVien() ? "" : `<button class="btn btn-soft btn-sm" type="button" data-open-auth="login">Đăng nhập để xem</button>`}
+      </div>`;
+    }
     return `
       <div class="card section ai-match-card" style="margin-top:0">
         <div class="ring-row">
@@ -372,45 +417,40 @@ const CotPhai = {
             <p class="muted">Dựa trên CV và kỹ năng của bạn</p>
           </div>
         </div>
-        <ul class="why-list">
-          ${job.whyMatch.pros.map((p) => `<li><span class="ok">✓</span>${thoatHtml(p)}</li>`).join("")}
-          ${job.whyMatch.cons.map((c) => `<li><span class="warn">!</span>Thiếu: ${thoatHtml(c)}</li>`).join("")}
-        </ul>
-        <div class="ai-note">${thoatHtml(job.whyMatch.comment)}</div>
+        ${htmlGiaiThich(job.whyMatch)}
       </div>`;
   },
 
-  /** Tóm tắt tiến trình đơn ứng tuyển. */
+  /** Tóm tắt tiến trình đơn ứng tuyển (đếm từ đơn thật). */
   tomTatDon(items) {
-    const viewed = items.filter((a) => a.steps.find((s) => s.key === "viewed")?.status !== "upcoming").length;
-    const interview = items.filter((a) => a.steps.find((s) => s.key === "interview")?.status !== "upcoming").length;
+    const daXem = items.filter((a) => a.status !== "pending").length;
     return `
       <section>
-        <h3 class="rail-title">Application Summary</h3>
+        <h3 class="rail-title">Tóm tắt ứng tuyển</h3>
         <div class="summary-list">
-          <div class="summary-item"><span class="stat-icon is-blue">${htmlIcon("send")}</span><span>Đã ứng tuyển</span><strong>${USER.stats.applied}</strong></div>
-          <div class="summary-item"><span class="stat-icon is-violet">${htmlIcon("eye")}</span><span>Nhà tuyển dụng đã xem</span><strong>${Math.max(viewed, 5)}</strong></div>
-          <div class="summary-item"><span class="stat-icon is-mint">${htmlIcon("video")}</span><span>Phỏng vấn</span><strong>${Math.max(interview, 2)}</strong></div>
+          <div class="summary-item"><span class="stat-icon is-blue">${htmlIcon("send")}</span><span>Đã ứng tuyển</span><strong>${items.length}</strong></div>
+          <div class="summary-item"><span class="stat-icon is-violet">${htmlIcon("eye")}</span><span>Nhà tuyển dụng đã xem</span><strong>${daXem}</strong></div>
+          <div class="summary-item"><span class="stat-icon is-mint">${htmlIcon("video")}</span><span>Phỏng vấn</span><strong>${USER.stats.interviewed}</strong></div>
         </div>
       </section>`;
   },
 
-  /** Vòng điểm hồ sơ AI trên rail trang Profile. */
+  /** Vòng điểm hồ sơ trên rail trang Profile + những mục còn thiếu (tính ở server). */
   diemHoSo() {
+    const thieu = USER.profileMissing;
     return `
       <div class="card section" style="margin-top:0">
         <div class="ring-row" style="display:flex;align-items:center;gap:16px">
           ${vongDiem(USER.profileScore)}
           <div>
-            <strong style="display:block">AI Profile Score</strong>
-            <p class="muted" style="font-size:.86rem">Thêm 2 kỹ năng để tăng khả năng matching.</p>
+            <strong style="display:block">Điểm hồ sơ</strong>
+            <p class="muted" style="font-size:.86rem">${thieu.length ? "Hoàn thiện các mục dưới để tăng độ chính xác khi so khớp." : "Hồ sơ đã đầy đủ."}</p>
           </div>
         </div>
         <ul class="why-list">
-          <li><span class="ok">✓</span>CV đã tải lên</li>
-          <li><span class="ok">✓</span>5 kỹ năng đã xác nhận</li>
-          <li><span class="warn">!</span>Chưa có portfolio</li>
-          <li><span class="warn">!</span>Thiếu kỹ năng: React, Motion</li>
+          ${USER.cv ? `<li><span class="ok">✓</span>CV đã tải lên</li>` : ""}
+          ${USER.skills.length ? `<li><span class="ok">✓</span>${USER.skills.length} kỹ năng trong hồ sơ</li>` : ""}
+          ${thieu.map((m) => `<li><span class="warn">!</span>${thoatHtml(m)}</li>`).join("")}
         </ul>
       </div>`;
   },
@@ -419,12 +459,10 @@ const CotPhai = {
   thongKeCongTy(company) {
     return `
       <section>
-        <h3 class="rail-title">Company statistics</h3>
+        <h3 class="rail-title">Thông tin công ty</h3>
         <div class="stats-grid">
           <div class="stat-card"><span class="stat-icon is-violet">${htmlIcon("briefcase")}</span><strong>${company.jobsCount}</strong><span>Việc đang mở</span></div>
-          <div class="stat-card"><span class="stat-icon is-pink">${htmlIcon("star")}</span><strong>${company.rating}</strong><span>Đánh giá</span></div>
-          <div class="stat-card"><span class="stat-icon is-blue">${htmlIcon("message-square")}</span><strong>${company.reviews}</strong><span>Reviews</span></div>
-          <div class="stat-card"><span class="stat-icon is-mint">${htmlIcon("users")}</span><strong>${company.followers}</strong><span>Theo dõi</span></div>
+          <div class="stat-card"><span class="stat-icon is-mint">${htmlIcon("users")}</span><strong>${thoatHtml(company.followers)}</strong><span>Người theo dõi</span></div>
         </div>
       </section>`;
   },
@@ -432,13 +470,38 @@ const CotPhai = {
   /** Thẻ công ty nhỏ trên rail trang chi tiết. */
   congTyMini(company) {
     return `
-      <a class="card card--hover mini-company" href="/companies?id=${company.id}">
+      <a class="card card--hover mini-company" href="/companies?id=${encodeURIComponent(company.id)}">
         ${htmlLogo(company)}
         <div><strong>${thoatHtml(company.name)}</strong><small>${thoatHtml(company.size)}</small></div>
         ${htmlIcon("chevron-right")}
       </a>`;
   },
 };
+
+/**
+ * Lời giải thích điểm khớp (tính ở MatchExplainer.php):
+ * điểm từng tiêu chí (breakdown), điểm mạnh (pros), điểm thiếu (cons), nhận xét (comment).
+ */
+function htmlGiaiThich(why) {
+  const tieuChi = (why.breakdown || [])
+    .map((b) =>
+      b.applicable
+        ? `<div class="crit-row" title="${thoatHtml(b.detail)}">
+            <span>${thoatHtml(b.label)} <small>(${b.weight}%)</small></span>
+            <div class="progress-bar"><span style="width:${b.score}%"></span></div>
+            <strong>${b.score}</strong>
+          </div>`
+        : `<div class="crit-row is-na"><span>${thoatHtml(b.label)}</span><small>${thoatHtml(b.detail)}</small></div>`
+    )
+    .join("");
+  return `
+    ${tieuChi ? `<div class="crit-list">${tieuChi}</div>` : ""}
+    <ul class="why-list">
+      ${why.pros.map((p) => `<li><span class="ok">✓</span>${thoatHtml(p)}</li>`).join("")}
+      ${why.cons.map((c) => `<li><span class="warn">!</span>${thoatHtml(c)}</li>`).join("")}
+    </ul>
+    ${why.comment ? `<div class="ai-note"><strong>AI nhận xét.</strong> ${thoatHtml(why.comment)}</div>` : ""}`;
+}
 
 /** Gắn HTML vào #rail rồi animate các score-ring bên trong */
 function doCotPhai(html) {
@@ -479,10 +542,14 @@ function ruotTheViec(job) {
       <div class="skill-row">${job.skills.map((s) => `<span class="chip">${thoatHtml(s)}</span>`).join("")}</div>
       <div class="why-box" data-open-match="${job.id}" role="button" tabindex="0">
         <strong>${htmlIcon("lightbulb")} Vì sao công việc này phù hợp?</strong>
-        <ul>
-          ${job.whyMatch.pros.slice(0, 4).map((p) => `<li class="ok">${thoatHtml(p)}</li>`).join("")}
-          ${job.whyMatch.cons[0] ? `<li class="warn">Thiếu: ${thoatHtml(job.whyMatch.cons[0])}</li>` : ""}
-        </ul>
+        ${
+          job.whyMatch
+            ? `<ul>
+          ${job.whyMatch.pros.slice(0, 3).map((p) => `<li class="ok">${thoatHtml(p)}</li>`).join("")}
+          ${job.whyMatch.cons[0] ? `<li class="warn">${thoatHtml(job.whyMatch.cons[0])}</li>` : ""}
+        </ul>`
+            : `<p class="muted">${laSinhVien() ? "Đang tính điểm cho tin này." : "Đăng nhập để AI so khớp CV của bạn với công việc này."}</p>`
+        }
       </div>
     </div>`;
 }
@@ -518,6 +585,11 @@ function hangViec(job, i = 0) {
 function moHopKhop(jobId) {
   const job = layViecTheoId(jobId);
   if (!job) return;
+  if (!job.whyMatch) {
+    if (!laSinhVien()) Popup.moDangNhap({ lyDo: "Đăng nhập để xem độ phù hợp của bạn với công việc này." });
+    else thongBao("Hệ thống đang tính điểm cho tin này", "loader");
+    return;
+  }
   chon("#match-overlay-body").innerHTML = `
     <button class="modal-close" type="button" data-close-modal aria-label="Đóng">${htmlIcon("x")}</button>
     <div class="ring-row" style="display:flex;align-items:center;gap:16px">
@@ -527,11 +599,7 @@ function moHopKhop(jobId) {
         <p class="muted" style="font-size:.86rem">${thoatHtml(job.company)} · Vì sao phù hợp?</p>
       </div>
     </div>
-    <ul class="why-list">
-      ${job.whyMatch.pros.map((p) => `<li><span class="ok">✓</span>${thoatHtml(p)}</li>`).join("")}
-      ${job.whyMatch.cons.map((c) => `<li><span class="warn">!</span>Thiếu: ${thoatHtml(c)}</li>`).join("")}
-    </ul>
-    <div class="ai-note"><strong>AI nhận xét.</strong> ${thoatHtml(job.whyMatch.comment)}</div>
+    ${htmlGiaiThich(job.whyMatch)}
     <a class="btn btn-primary btn-lg" style="margin-top:16px" href="/jobs?id=${job.id}">Xem chi tiết công việc</a>`;
   chon("#match-overlay").classList.add("is-open");
   veIcon();
@@ -542,10 +610,23 @@ function moHopKhop(jobId) {
  * Click toàn cục (một lần lúc boot):
  * - [data-open-match] → modal AI
  * - [data-close-modal] / click overlay / Escape → đóng
- * - [data-save] → đảo lưu job
+ * - [data-save] → đảo lưu job (API)
+ * - [data-open-auth] → popup đăng nhập / đăng ký
+ * - [data-auth-link] → khách bấm link cần đăng nhập: mở popup, đăng nhập xong mới chuyển trang
  */
 function ganClickToanTrang() {
-  document.addEventListener("click", (e) => {
+  document.addEventListener("click", async (e) => {
+    const authBtn = e.target.closest("[data-open-auth]");
+    if (authBtn) {
+      Popup.moDangNhap({ tab: authBtn.dataset.openAuth, lyDo: "Đăng nhập để nhận gợi ý việc hợp với CV của bạn." });
+      return;
+    }
+    const authLink = e.target.closest("[data-auth-link]");
+    if (authLink) {
+      e.preventDefault();
+      Popup.moDangNhap({ lyDo: "Mục này dành cho sinh viên đã đăng nhập.", viecCho: { type: "goto", url: authLink.dataset.authLink } });
+      return;
+    }
     const open = e.target.closest("[data-open-match]");
     if (open) {
       e.preventDefault();
@@ -557,11 +638,20 @@ function ganClickToanTrang() {
       chon("#match-overlay")?.classList.remove("is-open");
     }
     const save = e.target.closest("[data-save]");
-    if (save) {
-      const on = Kho.daoLuu(save.dataset.save);
-      save.classList.toggle("is-saved", on);
-      thongBao(on ? "Đã lưu công việc" : "Đã bỏ lưu", on ? "heart" : "heart-off");
-      document.dispatchEvent(new CustomEvent("jobly:saved-changed"));
+    if (save && !save.disabled) {
+      const id = Number(save.dataset.save);
+      if (!canDangNhap("Đăng nhập để lưu công việc và xem lại sau.", { type: "save", jobId: id })) return;
+      save.disabled = true;
+      try {
+        const on = await Kho.daoLuu(id);
+        chonHet(`[data-save="${id}"]`).forEach((b) => b.classList.toggle("is-saved", on));
+        thongBao(on ? "Đã lưu công việc" : "Đã bỏ lưu", on ? "heart" : "heart-off");
+        document.dispatchEvent(new CustomEvent("jobly:saved-changed"));
+      } catch (ex) {
+        if (ex.status !== 401) thongBao(ex.message, "circle-alert");
+      } finally {
+        save.disabled = false;
+      }
     }
   });
   document.addEventListener("keydown", (e) => {
@@ -574,10 +664,66 @@ function toiChiTiet(id) {
   location.href = `/jobs?id=${id}`;
 }
 
-/** Ghi applied rồi sang trang chúc mừng /match */
-function toiTrangKhop(id) {
-  Kho.themUngTuyen(id);
-  location.href = `/match?id=${id}`;
+/** Trạng thái rỗng khi id trên URL không tồn tại. */
+function veKhongTimThay(root, tieuDe, moTa) {
+  root.innerHTML = `
+    <div class="card empty-deck" style="margin:40px auto">
+      <div class="emoji">🔍</div>
+      <h2>${thoatHtml(tieuDe)}</h2>
+      <p>${thoatHtml(moTa)}</p>
+      <a class="btn btn-primary" href="/explore">Xem việc đang tuyển</a>
+    </div>`;
+}
+
+/** Việc tương tự: nhiều kỹ năng chung nhất, cùng số thì ưu tiên điểm khớp cao. */
+function viecTuongTu(job, soLuong = 3) {
+  const kyNang = new Set(job.skills);
+  const applied = new Set(Kho.daUngTuyen());
+  return JOBS.filter((j) => j.id !== job.id && !applied.has(j.id) && !daDongTuyen(j))
+    .map((j) => ({ j, chung: j.skills.filter((s) => kyNang.has(s)).length }))
+    .sort((a, b) => b.chung - a.chung || (b.j.match ?? -1) - (a.j.match ?? -1))
+    .slice(0, soLuong)
+    .map((x) => x.j);
+}
+
+/**
+ * Ứng tuyển thật qua API. Thành công → trang chúc mừng /match.
+ * Trả về true nếu đã gửi được đơn (hoặc đơn đã có từ trước), false nếu lỗi / chưa đăng nhập.
+ */
+async function ungTuyenViec(id) {
+  const job = layViecTheoId(id);
+  if (!canDangNhap(`Đăng nhập để ứng tuyển${job ? ` vị trí ${job.title}` : ""}.`, { type: "apply", jobId: Number(id) })) return false;
+  try {
+    await Kho.ungTuyen(id);
+    location.href = `/match?id=${id}`;
+    return true;
+  } catch (ex) {
+    if (ex.status === 409) {
+      thongBao("Bạn đã ứng tuyển việc này rồi", "info");
+      location.href = "/applications";
+      return true;
+    }
+    if (ex.status === 401) return false;
+    thongBao(ex.message, "circle-alert");
+    return false;
+  }
+}
+
+/** Chạy tiếp việc khách đang làm dở trước khi đăng nhập (lưu trong ViecCho). */
+async function chayViecCho() {
+  const viec = ViecCho.lay();
+  if (!viec || !laSinhVien()) return;
+  if (viec.type === "goto" && /^\/(?!\/)/.test(viec.url)) location.href = viec.url;
+  if (viec.type === "apply" && !Kho.daUngTuyen().includes(viec.jobId)) await ungTuyenViec(viec.jobId);
+  if (viec.type === "save" && !Kho.dangLuu(viec.jobId)) {
+    await Kho.daoLuu(viec.jobId).catch(() => null);
+    chonHet(`[data-save="${viec.jobId}"]`).forEach((b) => b.classList.add("is-saved"));
+    thongBao("Đã lưu công việc", "heart");
+  }
+  if (viec.type === "follow" && !Kho.dangTheoDoi(viec.slug)) {
+    await Kho.daoTheoDoi(viec.slug).catch(() => null);
+    document.dispatchEvent(new CustomEvent("jobly:follow-changed"));
+  }
 }
 
 /* =========================================================
@@ -592,7 +738,7 @@ function toiTrangKhop(id) {
 /** Job chưa apply/skip — dùng để vẽ chồng thẻ Home. */
 function viecChoChongThe() {
   const hidden = new Set([...Kho.daUngTuyen(), ...Kho.daBo()]);
-  return JOBS.filter((j) => !hidden.has(j.id)).sort((a, b) => b.match - a.match);
+  return viecGoiY(JOBS.length).filter((j) => !hidden.has(j.id));
 }
 
 /** Vẽ 3 thẻ vuốt đầu tiên vào #card-stack. */
@@ -602,22 +748,26 @@ function veChongThe() {
   const jobs = viecChoChongThe();
   if (!jobs.length) {
     // Hết bài: empty state + nút xóa skipped để xem lại (giữ applied)
-    stack.outerHTML = `
+    const coTheXemLai = Kho.daBo().length > 0;
+    stack.innerHTML = `
       <div class="card empty-deck">
         <div class="emoji">✨</div>
-        <h2>Bạn đã xem hết gợi ý hôm nay</h2>
-        <p>Khám phá thêm cơ hội khác, hoặc theo dõi những việc đã ứng tuyển.</p>
+        <h2>${JOBS.length ? "Bạn đã xem hết gợi ý hôm nay" : "Chưa có tin tuyển dụng nào"}</h2>
+        <p>${JOBS.length ? "Khám phá thêm cơ hội khác, hoặc theo dõi những việc đã ứng tuyển." : "Quay lại sau nhé, nhà tuyển dụng đang đăng tin mới."}</p>
         <div class="match-actions">
           <a class="btn btn-primary" href="/explore">Khám phá thêm</a>
-          <button class="btn btn-ghost" type="button" id="reset-deck">Xem lại từ đầu</button>
+          ${coTheXemLai ? `<button class="btn btn-ghost" type="button" id="reset-deck">Xem lại từ đầu</button>` : ""}
         </div>
       </div>`;
     chon("#reset-deck")?.addEventListener("click", () => {
-      localStorage.removeItem(Kho.key.skipped);
-      location.reload();
+      Kho.xoaBo();
+      veChongThe();
+      veIcon();
     });
+    chonHet(".swipe-actions button").forEach((b) => (b.disabled = true));
     return;
   }
+  chonHet(".swipe-actions button").forEach((b) => (b.disabled = false));
   stack.innerHTML = jobs
     .slice(0, 3)
     .map((job, i) => `<article class="job-card ${["is-front", "is-back-1", "is-back-2"][i]}" data-job-id="${job.id}">${ruotTheViec(job)}</article>`)
@@ -641,9 +791,31 @@ function doLaiChongThe() {
   }
 }
 
+/** Hộp thông báo (chuông) trên Home: dựng từ đơn đã được xử lý, tin nhắn chưa đọc và việc khớp cao. */
+function veThongBaoHome() {
+  const pop = chon("#notify-pop");
+  if (!pop) return;
+  const dong = [];
+  APPLICATIONS.filter((a) => a.status !== "pending")
+    .slice(0, 3)
+    .forEach((a) => {
+      const job = layViecTheoId(a.jobId);
+      if (job) dong.push(`<p><strong>${thoatHtml(job.company)}</strong> · ${thoatHtml(job.title)}: ${thoatHtml(a.statusLabel)}</p>`);
+    });
+  if (JOBLY.unread) dong.push(`<p>Bạn có <strong>${JOBLY.unread}</strong> tin nhắn chưa đọc</p>`);
+  const khopCao = JOBS.filter((j) => j.match >= 80 && !Kho.daUngTuyen().includes(j.id) && !daDongTuyen(j)).length;
+  if (khopCao) dong.push(`<p>AI tìm thấy <strong>${khopCao}</strong> việc khớp từ 80% trở lên</p>`);
+
+  chon(".notify-dot")?.toggleAttribute("hidden", !dong.length);
+  pop.innerHTML = dong.length
+    ? `${dong.join("")}${laSinhVien() ? `<a href="/chat">Mở tin nhắn →</a>` : ""}`
+    : `<p class="muted">${laSinhVien() ? "Chưa có thông báo mới." : "Đăng nhập để nhận thông báo về đơn ứng tuyển."}</p>`;
+}
+
 /** Khởi tạo trang Home: rail + chồng thẻ + BoVuot. */
 function khoiTrangHome() {
   doCotPhai(`${CotPhai.hoSoAI()}${CotPhai.thongKeNhanh()}${CotPhai.viecGoiY()}${CotPhai.theSuNghiep()}`);
+  veThongBaoHome();
 
   chon("#btn-notify")?.addEventListener("click", (e) => {
     e.stopPropagation();
@@ -660,7 +832,13 @@ function khoiTrangHome() {
 
   BoVuot.khoiTao({
     chongThe: stack,
-    khiUngTuyen: (id) => toiTrangKhop(id),
+    // Vuốt lên: gửi đơn thật. Khách / lỗi → thẻ đã bay mất nên vẽ lại chồng thẻ.
+    khiUngTuyen: async (id) => {
+      if (!(await ungTuyenViec(id))) {
+        veChongThe();
+        veIcon();
+      }
+    },
     khiBo: (id) => {
       Kho.themBo(id);
       if (!viecChoChongThe().length) veChongThe();
@@ -704,7 +882,7 @@ function khoiTrangKhamPha() {
   const input = chon("#explore-search");
   if (input) input.value = query;
 
-  doCotPhai(`${CotPhai.hoSoAI()}${CotPhai.viecGoiY("AI đề xuất", null, [1, 4, 6])}${CotPhai.theSuNghiep()}`);
+  doCotPhai(`${CotPhai.hoSoAI()}${CotPhai.viecGoiY(laSinhVien() ? "AI đề xuất" : "Tin mới nhất")}${CotPhai.theSuNghiep()}`);
 
   if (savedOnly) {
     chon("#page-title").textContent = "Đã lưu";
@@ -713,7 +891,9 @@ function khoiTrangKhamPha() {
 
   const veDanhSachViec = () => {
     const q = query.toLowerCase();
-    let jobs = [...JOBS].sort((a, b) => b.match - a.match);
+    let jobs = JOBS.filter((j) => !daDongTuyen(j)).sort(
+      (a, b) => (b.match ?? -1) - (a.match ?? -1) || String(b.postedAt).localeCompare(String(a.postedAt))
+    );
     if (q) {
       jobs = jobs.filter((j) =>
         [j.title, j.company, j.location, ...j.skills].join(" ").toLowerCase().includes(q)
@@ -727,7 +907,11 @@ function khoiTrangKhamPha() {
     list.innerHTML = jobs.length
       ? jobs.map(hangViec).join("")
       : `<div class="card empty-deck" style="width:100%"><div class="emoji">🔍</div><h2>Chưa có việc nào ở đây</h2><p>${
-          filter === "saved" ? "Nhấn ♡ trên một công việc để lưu lại." : "Thử bộ lọc hoặc từ khóa khác."
+          filter !== "saved"
+            ? "Thử bộ lọc hoặc từ khóa khác."
+            : laSinhVien()
+              ? "Nhấn ♡ trên một công việc để lưu lại."
+              : "Đăng nhập để xem những việc bạn đã lưu."
         }</p></div>`;
     veIcon();
   };
@@ -735,6 +919,7 @@ function khoiTrangKhamPha() {
   chonHet(".filter-chip").forEach((chip) => {
     chip.classList.toggle("is-active", chip.dataset.filter === filter);
     chip.addEventListener("click", () => {
+      if (chip.dataset.filter === "saved" && !canDangNhap("Đăng nhập để xem những việc bạn đã lưu.", { type: "goto", url: "/explore?saved=1" })) return;
       chonHet(".filter-chip").forEach((c) => c.classList.remove("is-active"));
       chip.classList.add("is-active");
       filter = chip.dataset.filter;
@@ -760,9 +945,15 @@ function khoiTrangKhamPha() {
 function khoiTrangChiTiet() {
   const root = chon("#detail-root");
   if (!root) return;
-  const job = layViecTheoId(thamSoUrl("id")) || JOBS[0];
+  const job = layViecTheoId(thamSoUrl("id"));
+  if (!job) {
+    veKhongTimThay(root, "Không tìm thấy công việc", "Tin có thể đã ngừng tuyển hoặc đường dẫn không đúng.");
+    doCotPhai(`${CotPhai.viecGoiY("Việc đang tuyển")}`);
+    return;
+  }
   const company = layCongTy(job.companyId);
   const applied = Kho.daUngTuyen().includes(job.id);
+  const closed = daDongTuyen(job);
   document.title = `${job.title} — ${job.company} | Jobly`;
 
   root.innerHTML = `
@@ -797,23 +988,29 @@ function khoiTrangChiTiet() {
   doCotPhai(`
     <div class="sticky-cta" style="display:flex;flex-direction:column;gap:16px">
       ${CotPhai.khopAI(job)}
-      <button class="btn btn-primary btn-lg ${applied ? "is-done" : ""}" id="apply-now" type="button">
-        ${applied ? `${htmlIcon("check")} Đã ứng tuyển` : `${htmlIcon("send")} Ứng tuyển ngay`}
-      </button>
+      ${
+        closed && !applied
+          ? `<button class="btn btn-lg" type="button" disabled>${htmlIcon("lock")} Tin đã ngừng tuyển</button>`
+          : `<button class="btn btn-primary btn-lg ${applied ? "is-done" : ""}" id="apply-now" type="button">
+        ${applied ? `${htmlIcon("check")} Đã ứng tuyển · xem tiến trình` : `${htmlIcon("send")} Ứng tuyển ngay`}
+      </button>`
+      }
       ${CotPhai.congTyMini(company)}
-      ${CotPhai.viecGoiY("Việc tương tự", job.id, [2, 7, 1, 4])}
+      ${CotPhai.viecGoiY("Việc tương tự", job.id, viecTuongTu(job))}
     </div>`);
 
-  chon("#apply-now")?.addEventListener("click", (e) => {
+  chon("#apply-now")?.addEventListener("click", async (e) => {
     const btn = e.currentTarget;
     if (btn.classList.contains("is-done")) {
       location.href = "/applications";
       return;
     }
-    btn.classList.add("is-done");
-    btn.innerHTML = `${htmlIcon("check")} Đã ứng tuyển`;
-    veIcon();
-    window.setTimeout(() => toiTrangKhop(job.id), 450);
+    btn.disabled = true;
+    btn.classList.add("is-loading");
+    if (!(await ungTuyenViec(job.id))) {
+      btn.disabled = false;
+      btn.classList.remove("is-loading");
+    }
   });
   chon("#share-btn")?.addEventListener("click", () => {
     navigator.clipboard?.writeText(location.href);
@@ -845,20 +1042,25 @@ function phaoGiay() {
 function khoiTrangKhop() {
   const root = chon("#match-root");
   if (!root) return;
-  const job = layViecTheoId(thamSoUrl("id")) || JOBS[0];
+  const job = layViecTheoId(thamSoUrl("id"));
+  const app = job && layDonTheoViec(job.id);
+  // Chỉ chúc mừng khi đơn thật sự tồn tại; gõ thẳng URL với việc chưa nộp → về trang chi tiết.
+  if (!app) {
+    location.replace(job ? `/jobs?id=${job.id}` : "/applications");
+    return;
+  }
   const company = layCongTy(job.companyId);
-  Kho.themUngTuyen(job.id);
   phaoGiay();
 
   root.innerHTML = `
     <div class="card match-hero">
       <div class="match-emoji">🎉</div>
       <h1>Tuyệt vời!</h1>
-      <p>Bạn đã ứng tuyển thành công.<br><strong>${thoatHtml(job.company)}</strong> đã nhận được CV của bạn.</p>
+      <p>Bạn đã ứng tuyển thành công.<br><strong>${thoatHtml(job.company)}</strong> đã nhận được ${USER.cv ? "CV" : "hồ sơ"} của bạn.</p>
       <a class="card card--hover match-mini" href="/jobs?id=${job.id}">
         <img src="${job.image}" alt="">
         <div><strong>${thoatHtml(job.title)}</strong><small>${thoatHtml(job.company)} · ${thoatHtml(job.location.split(",")[0])}</small></div>
-        <span class="match-pill" data-tone="${mucDoKhop(job.match)}">${job.match}% phù hợp</span>
+        ${nhanKhop(job, " phù hợp")}
       </a>
       <div class="match-actions">
         <a class="btn btn-primary" href="/applications">${htmlIcon("route")} Xem tiến trình</a>
@@ -876,21 +1078,24 @@ function khoiTrangKhop() {
     <div class="card section" style="margin-top:0">
       <h2>Điều gì xảy ra tiếp theo?</h2>
       <ul class="why-list" style="margin-top:0">
-        <li><span class="ok">✓</span>CV của bạn đã được gửi tới ${thoatHtml(company.name)}</li>
-        <li><span class="ok">✓</span>AI đã đính kèm bản tóm tắt điểm mạnh của bạn</li>
-        <li><span class="warn">2</span>Nhà tuyển dụng thường phản hồi trong 2–3 ngày</li>
-        <li><span class="warn">3</span>Bạn sẽ nhận thông báo khi được mời phỏng vấn</li>
+        <li><span class="ok">✓</span>${USER.cv ? `CV ${thoatHtml(USER.cv.name)} đã được gửi tới ${thoatHtml(company.name)}` : `Hồ sơ của bạn đã được gửi tới ${thoatHtml(company.name)}`}</li>
+        <li><span class="warn">2</span>Trạng thái đơn cập nhật trong mục Tiến trình mỗi khi nhà tuyển dụng xử lý</li>
+        <li><span class="warn">3</span>Nhà tuyển dụng có thể nhắn tin trực tiếp cho bạn trong mục Tin nhắn</li>
       </ul>
-      <div class="ai-note">
-        <strong>Mẹo từ AI.</strong> Bổ sung ${thoatHtml(job.whyMatch.cons[0] || "portfolio")} vào hồ sơ để tăng cơ hội được shortlist.
-      </div>
+      ${
+        USER.cv
+          ? job.whyMatch?.cons[0]
+            ? `<div class="ai-note"><strong>Mẹo từ AI.</strong> ${thoatHtml(job.whyMatch.cons[0])} Bổ sung vào hồ sơ để tăng cơ hội.</div>`
+            : ""
+          : `<div class="ai-note"><strong>Mẹo.</strong> Bạn chưa có CV. <a href="/profile">Tải CV lên</a> để nhà tuyển dụng xem được kinh nghiệm của bạn.</div>`
+      }
       <div class="match-actions" style="margin-top:14px;justify-content:flex-start">
-        <a class="btn btn-soft btn-sm" href="/chat?c=${company.id}">${htmlIcon("message-circle")} Mở tin nhắn</a>
-        <a class="btn btn-soft btn-sm" href="/companies?id=${company.id}">${htmlIcon("building-2")} Xem công ty</a>
+        <a class="btn btn-soft btn-sm" href="/chat?c=${app.id}">${htmlIcon("message-circle")} Mở tin nhắn</a>
+        <a class="btn btn-soft btn-sm" href="/companies?id=${encodeURIComponent(company.id)}">${htmlIcon("building-2")} Xem công ty</a>
       </div>
     </div>
     ${CotPhai.thongKeNhanh()}
-    ${CotPhai.viecGoiY("Tiếp tục khám phá", job.id, [2, 3, 5, 4])}
+    ${CotPhai.viecGoiY("Tiếp tục khám phá", job.id)}
     ${CotPhai.theSuNghiep()}`);
   veIcon();
 }
@@ -906,12 +1111,15 @@ function khoiTrangChat() {
   if (!layout) return;
   const convItems = chon("#conv-items");
   const thread = chon("#chat-thread");
-  let activeId = thamSoUrl("c") || CONVERSATIONS[0].id;
+  if (!CONVERSATIONS.length) {
+    layout.innerHTML = `<div class="card empty-deck" style="margin:40px auto"><div class="emoji">💬</div><h2>Chưa có hội thoại</h2><p>Mỗi đơn ứng tuyển là một hội thoại với nhà tuyển dụng.</p><a class="btn btn-primary" href="/">Tìm việc</a></div>`;
+    return;
+  }
+  CONVERSATIONS.forEach((c) => (c.id = String(c.id)));
+  let activeId = CONVERSATIONS.some((c) => c.id === thamSoUrl("c")) ? thamSoUrl("c") : CONVERSATIONS[0].id;
   const messagesById = {};
 
-  /** Thread đầy đủ cho Mây Creative; hội thoại khác = 3 tin giả từ conv.last */
   const dungTinNhan = (conv) => {
-    if (conv.id === CHAT_THREAD.companyId) return [...CHAT_THREAD.messages];
     const job = layViecTheoId(conv.jobId);
     return [
       { id: 1, from: "recruiter", text: `Chào Bảo! Cảm ơn bạn đã ứng tuyển vị trí ${job.title}.`, time: "10:02" },
@@ -1051,7 +1259,7 @@ function khoiTrangChat() {
 
       <div class="info-block">
         <h4>File đã chia sẻ</h4>
-        <div class="file-item"><span class="cv-icon">${htmlIcon("file-text")}</span><div><strong>${USER.cvFile}</strong><small>PDF · 1.2 MB · Bạn đã gửi</small></div></div>
+        <div class="file-item"><span class="cv-icon">${htmlIcon("file-text")}</span><div><strong>${thoatHtml(USER.cv?.name || "Chưa có CV")}</strong><small>Bạn đã gửi</small></div></div>
         <div class="file-item"><span class="cv-icon" style="background:linear-gradient(135deg,#3b82f6,#60a5fa)">${htmlIcon("file")}</span><div><strong>JD_${thoatHtml(job.title.replace(/\s+/g, "_"))}.pdf</strong><small>PDF · 340 KB · ${thoatHtml(c.name)}</small></div></div>
       </div>
 
@@ -1091,7 +1299,7 @@ function khoiTrangChat() {
       ? `<span class="online-dot"></span>Đang hoạt động · ${thoatHtml(job.title)}`
       : `Hoạt động ${conv.time.toLowerCase()} · ${thoatHtml(job.title)}`;
     chon("#chat-company-link").href = `/companies?id=${c.id}`;
-    chon("#quick-replies").style.display = id === CHAT_THREAD.companyId ? "" : "none";
+    chon("#quick-replies").style.display = "none";
     layout.classList.remove("show-list");
     veDanhSachHoiThoai();
     veLuongTin();
@@ -1189,43 +1397,37 @@ function khoiTrangChat() {
 }
 
 /* ---------- APPLICATIONS ----------
-   Timeline mock từ APPLICATIONS (data.js) + job user vừa apply (Store) chưa có trong mock.
+   Đơn thật (APPLICATIONS). steps do server tính từ trạng thái đơn (ApplicationStatus::timeline).
+   Rút đơn được khi canWithdraw (nhà tuyển dụng chưa đưa vào vòng trong).
    ---------- */
 /** Khởi tạo trang timeline đơn ứng tuyển. */
 function khoiTrangDon() {
   const list = chon("#app-list");
   if (!list) return;
 
-  const blank = (jobId) => ({
-    jobId,
-    steps: [
-      { key: "applied", label: "Đã ứng tuyển", status: "done" },
-      { key: "viewed", label: "NTD đã xem", status: "upcoming" },
-      { key: "shortlist", label: "Shortlist", status: "upcoming" },
-      { key: "interview", label: "Phỏng vấn", status: "upcoming" },
-      { key: "result", label: "Kết quả", status: "upcoming" },
-    ],
-  });
-  const extra = Kho.daUngTuyen()
-    .filter((id) => !APPLICATIONS.some((a) => a.jobId === id))
-    .map(blank);
-  const items = [...extra, ...APPLICATIONS];
-
-  list.innerHTML = items
-    .map((app, i) => {
-      const job = layViecTheoId(app.jobId);
-      if (!job) return "";
-      const c = layCongTy(job.companyId);
-      const current = app.steps.find((s) => s.status === "current")?.label || "Chờ phản hồi";
-      return `
+  const veDanhSachDon = () => {
+    if (!APPLICATIONS.length) {
+      list.innerHTML = `
+        <div class="card empty-deck" style="width:100%">
+          <div class="emoji">📭</div>
+          <h2>Bạn chưa ứng tuyển việc nào</h2>
+          <p>Vuốt lên ở trang chủ hoặc bấm "Ứng tuyển ngay" trong trang chi tiết để gửi hồ sơ.</p>
+          <a class="btn btn-primary" href="/">Tìm việc phù hợp</a>
+        </div>`;
+    } else {
+      list.innerHTML = APPLICATIONS.map((app, i) => {
+        const job = layViecTheoId(app.jobId);
+        if (!job) return "";
+        const c = layCongTy(job.companyId);
+        return `
         <article class="card card--hover app-card" style="animation:pageIn .4s ${i * 60}ms var(--ease) both">
           <div class="app-card-head">
             ${htmlLogo(c)}
             <div>
               <h2><a href="/jobs?id=${job.id}">${thoatHtml(job.title)}</a></h2>
-              <small>${thoatHtml(job.company)} · ${thoatHtml(job.salary)}</small>
+              <small>${thoatHtml(job.company)} · ${thoatHtml(job.salary)} · Nộp ngày ${thoatHtml(ngayVn(app.appliedAt))}</small>
             </div>
-            <span class="status-tag">${thoatHtml(current)}</span>
+            <span class="status-tag" data-status="${app.status}">${thoatHtml(app.statusLabel)}</span>
           </div>
           <div class="timeline">
             ${app.steps
@@ -1236,12 +1438,43 @@ function khoiTrangDon() {
               )
               .join("")}
           </div>
+          <div class="app-card-actions">
+            <a class="btn btn-soft btn-sm" href="/chat?c=${app.id}">${htmlIcon("message-circle")} Nhắn tin</a>
+            ${app.canWithdraw ? `<button class="btn btn-ghost btn-sm" type="button" data-withdraw="${app.id}">${htmlIcon("undo-2")} Rút đơn</button>` : ""}
+          </div>
         </article>`;
-    })
-    .join("");
+      }).join("");
+    }
+    doCotPhai(`${CotPhai.tomTatDon(APPLICATIONS)}${CotPhai.viecGoiY("Cơ hội tiếp theo")}${CotPhai.theSuNghiep()}`);
+    veIcon();
+  };
 
-  doCotPhai(`${CotPhai.tomTatDon(items)}${CotPhai.viecGoiY("Cơ hội tiếp theo", null, [7, 3, 8])}${CotPhai.theSuNghiep()}`);
-  veIcon();
+  list.addEventListener("click", async (e) => {
+    const btn = e.target.closest("[data-withdraw]");
+    if (!btn) return;
+    const id = Number(btn.dataset.withdraw);
+    const job = layViecTheoId(APPLICATIONS.find((a) => a.id === id)?.jobId);
+    if (!window.confirm(`Rút đơn ứng tuyển${job ? ` "${job.title}"` : ""}? Tin nhắn với nhà tuyển dụng cũng sẽ bị xóa.`)) return;
+    btn.disabled = true;
+    try {
+      const data = await Api.goi("DELETE", `/api/applications/${id}`);
+      APPLICATIONS.splice(APPLICATIONS.findIndex((a) => a.id === id), 1);
+      USER.stats.applied = APPLICATIONS.length;
+      thongBao(data.message, "undo-2");
+      veDanhSachDon();
+    } catch (ex) {
+      btn.disabled = false;
+      thongBao(ex.message, "circle-alert");
+    }
+  });
+
+  veDanhSachDon();
+}
+
+/** "2026-09-23" → "23/09/2026". */
+function ngayVn(isoDate) {
+  const [y, m, d] = String(isoDate || "").split("-");
+  return d ? `${d}/${m}/${y}` : "";
 }
 
 /* ---------- PROFILE ----------
@@ -1256,7 +1489,7 @@ function khoiTrangHoSo() {
       <div class="profile-cover"></div>
       <div class="profile-body">
         <div class="profile-id">
-          <img class="profile-avatar" src="${USER.avatar}" alt="${USER.name}">
+          <img class="profile-avatar" src="${anhDaiDien(USER)}" alt="">
           <div>
             <h1>${USER.name}</h1>
             <p>${USER.year} · ${USER.school}</p>
@@ -1287,7 +1520,7 @@ function khoiTrangHoSo() {
       <h2>CV</h2>
       <div class="cv-card">
         <span class="cv-icon">${htmlIcon("file-text")}</span>
-        <div><strong>${USER.cvFile}</strong><small>${USER.cvUpdated} · PDF · 1.2 MB</small></div>
+        <div><strong>${thoatHtml(USER.cv?.name || "Chưa có CV")}</strong><small>${thoatHtml(USER.cv?.updated || "")}</small></div>
         <div class="cv-actions">
           <button class="btn btn-soft btn-sm" type="button" data-toast="Đang mở CV…">${htmlIcon("eye")} Xem CV</button>
           <button class="btn btn-ghost btn-sm" type="button" data-toast="Chọn file để cập nhật CV">${htmlIcon("upload")} Cập nhật</button>
@@ -1305,7 +1538,7 @@ function khoiTrangHoSo() {
       </div>
     </section>`;
 
-  doCotPhai(`${CotPhai.diemHoSo()}${CotPhai.thongKeNhanh()}${CotPhai.viecGoiY("Việc phù hợp với bạn", null, [1, 4, 2])}`);
+  doCotPhai(`${CotPhai.diemHoSo()}${CotPhai.thongKeNhanh()}${CotPhai.viecGoiY("Việc phù hợp với bạn")}`);
 
   root.addEventListener("click", (e) => {
     const t = e.target.closest("[data-toast]");
@@ -1317,16 +1550,27 @@ function khoiTrangHoSo() {
 }
 
 /* ---------- COMPANY ----------
-   /companies?id= — hero, tab Giới thiệu / Việc làm / Đánh giá, follow (Store).
+   /companies?id=<slug> — hero, tab Giới thiệu / Việc làm, theo dõi qua API.
+   Nút nhắn tin chỉ hiện khi sinh viên đã có đơn ở công ty (hội thoại gắn với đơn).
    ---------- */
 /** Khởi tạo trang công ty. */
 function khoiTrangCongTy() {
   const root = chon("#company-root");
   if (!root) return;
-  const company = layCongTy(thamSoUrl("id")) || layCongTy("may-creative");
+  const company = layCongTy(thamSoUrl("id"));
+  if (!company) {
+    veKhongTimThay(root, "Không tìm thấy công ty", "Đường dẫn không đúng hoặc công ty đã ngừng hoạt động.");
+    doCotPhai(CotPhai.viecGoiY("Việc đang tuyển"));
+    return;
+  }
   const jobs = viecCuaCongTy(company.id);
-  const following = Kho.dangTheoDoi(company.id);
+  const hoiThoai = CONVERSATIONS.find((c) => c.companyId === company.id);
   document.title = `${company.name} — Jobly`;
+
+  const htmlNutTheoDoi = (on) => (on ? `${htmlIcon("check")} Đang theo dõi` : `${htmlIcon("plus")} Theo dõi`);
+  const danhSach = jobs.length
+    ? `<div class="job-list">${jobs.map(hangViec).join("")}</div>`
+    : `<p class="muted">Công ty chưa có tin đang tuyển.</p>`;
 
   root.innerHTML = `
     <article class="card company-hero">
@@ -1340,10 +1584,10 @@ function khoiTrangCongTy() {
           </div>
         </div>
         <div class="job-row-actions">
-          <button class="btn btn-primary follow-btn ${following ? "is-following" : ""}" id="follow-btn" type="button">
-            ${following ? `${htmlIcon("check")} Đang theo dõi` : `${htmlIcon("plus")} Theo dõi`}
+          <button class="btn btn-primary follow-btn ${Kho.dangTheoDoi(company.id) ? "is-following" : ""}" id="follow-btn" type="button">
+            ${htmlNutTheoDoi(Kho.dangTheoDoi(company.id))}
           </button>
-          <a class="icon-btn" href="/chat?c=${company.id}" aria-label="Nhắn tin">${htmlIcon("message-circle")}</a>
+          ${hoiThoai ? `<a class="icon-btn" href="/chat?c=${hoiThoai.id}" aria-label="Nhắn tin">${htmlIcon("message-circle")}</a>` : ""}
         </div>
       </div>
     </article>
@@ -1351,57 +1595,53 @@ function khoiTrangCongTy() {
     <div class="tabs" role="tablist">
       <button class="tab is-active" data-tab="about" type="button">Giới thiệu</button>
       <button class="tab" data-tab="jobs" type="button">Việc làm <span class="chip" style="padding:2px 8px;margin-left:4px">${jobs.length}</span></button>
-      <button class="tab" data-tab="reviews" type="button">Đánh giá</button>
     </div>
 
     <div class="tab-panel is-active" data-panel="about">
-      <section class="card section"><h2>About company</h2><p>${thoatHtml(company.about)}</p></section>
+      <section class="card section"><h2>Về công ty</h2><p>${thoatHtml(company.about || "Công ty chưa cập nhật phần giới thiệu.")}</p></section>
       <section class="card section">
-        <h2>Open positions</h2>
-        <div class="job-list">${jobs.map(hangViec).join("")}</div>
+        <h2>Vị trí đang tuyển</h2>
+        ${danhSach}
       </section>
     </div>
     <div class="tab-panel" data-panel="jobs">
-      <div class="job-list" style="margin-top:16px">${jobs.map(hangViec).join("")}</div>
-    </div>
-    <div class="tab-panel" data-panel="reviews">
-      <section class="card section">
-        <div class="rating-big">
-          <strong>${company.rating}</strong>
-          <div><div class="stars" style="color:#f59e0b">★★★★★</div><p class="muted">${company.reviews} đánh giá từ sinh viên đã làm việc</p></div>
-        </div>
-      </section>
-      <section class="card section">
-        ${REVIEWS.map(
-          (r) => `
-          <div class="review">
-            <span class="review-avatar">${r.name[0]}</span>
-            <div>
-              <strong>${thoatHtml(r.name)}</strong> <span class="muted" style="font-size:.8rem">· ${thoatHtml(r.role)}</span>
-              <div class="stars">${"★".repeat(r.stars)}${"☆".repeat(5 - r.stars)}</div>
-              <p>${thoatHtml(r.text)}</p>
-            </div>
-          </div>`
-        ).join("")}
-      </section>
+      <div style="margin-top:16px">${danhSach}</div>
     </div>`;
 
-  doCotPhai(`${CotPhai.thongKeCongTy(company)}${CotPhai.viecGoiY("Việc nổi bật", null, jobs.map((j) => j.id).concat([2, 6]))}${CotPhai.theSuNghiep()}`);
+  const veCot = () =>
+    doCotPhai(`${CotPhai.thongKeCongTy(company)}${CotPhai.viecGoiY("Việc nổi bật", null, jobs.slice(0, 3))}${CotPhai.theSuNghiep()}`);
+  veCot();
 
-  root.addEventListener("click", (e) => {
+  const capNhatNut = () => {
+    const btn = chon("#follow-btn");
+    btn.classList.toggle("is-following", Kho.dangTheoDoi(company.id));
+    btn.innerHTML = htmlNutTheoDoi(Kho.dangTheoDoi(company.id));
+    veIcon();
+  };
+  document.addEventListener("jobly:follow-changed", capNhatNut);
+
+  root.addEventListener("click", async (e) => {
     const tab = e.target.closest("[data-tab]");
     if (tab) {
       chonHet(".tab", root).forEach((t) => t.classList.toggle("is-active", t === tab));
       chonHet(".tab-panel", root).forEach((p) => p.classList.toggle("is-active", p.dataset.panel === tab.dataset.tab));
       veIcon();
     }
-    if (e.target.closest("#follow-btn")) {
-      const on = Kho.daoTheoDoi(company.id);
-      const btn = chon("#follow-btn");
-      btn.classList.toggle("is-following", on);
-      btn.innerHTML = on ? `${htmlIcon("check")} Đang theo dõi` : `${htmlIcon("plus")} Theo dõi`;
-      veIcon();
-      thongBao(on ? `Đang theo dõi ${company.name}` : "Đã bỏ theo dõi", on ? "bell-ring" : "bell-off");
+    const btn = e.target.closest("#follow-btn");
+    if (btn && !btn.disabled) {
+      if (!canDangNhap(`Đăng nhập để theo dõi ${company.name}.`, { type: "follow", slug: company.id })) return;
+      btn.disabled = true;
+      try {
+        const data = await Kho.daoTheoDoi(company.id);
+        company.followers = String(data.followers);
+        capNhatNut();
+        veCot();
+        thongBao(data.message, data.following ? "bell-ring" : "bell-off");
+      } catch (ex) {
+        if (ex.status !== 401) thongBao(ex.message, "circle-alert");
+      } finally {
+        btn.disabled = false;
+      }
     }
   });
   veIcon();
@@ -1427,4 +1667,5 @@ document.addEventListener("DOMContentLoaded", () => {
   };
   pages[document.body.dataset.page]?.();
   veIcon();
+  chayViecCho();
 });

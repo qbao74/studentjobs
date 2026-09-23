@@ -26,6 +26,7 @@ class PagePayloadTest extends TestCase
         $this->assertFalse($payload['auth']['loggedIn']);
         $this->assertSame(['Việc đang mở'], array_column($payload['jobs'], 'title'));
         $this->assertNull($payload['jobs'][0]['match']);
+        $this->assertFalse($payload['jobs'][0]['closed']);
         $this->assertNull($payload['user']);
     }
 
@@ -56,12 +57,19 @@ class PagePayloadTest extends TestCase
 
         $payload = app(JoblyPayload::class)->build($student->user);
 
-        $this->assertContains($job->id, array_column($payload['jobs'], 'id'));
+        $shown = collect($payload['jobs'])->firstWhere('id', $job->id);
+        $this->assertNotNull($shown);
+        $this->assertTrue($shown['closed'], 'Giao diện dựa vào cờ closed để khóa nút ứng tuyển.');
     }
 
     public function test_pages_render_payload_and_employers_are_redirected(): void
     {
-        $this->get('/')->assertOk()->assertSee('window.JOBLY', false);
+        $this->get('/')->assertOk()->assertSee('window.JOBLY', false)->assertSee('Chào bạn!');
+
+        $student = Student::factory()->create();
+        $student->user->update(['name' => 'Trần Thị Hoa']);
+        $this->actingAs($student->user)->get('/')->assertOk()->assertSee('Chào Hoa!');
+        auth()->logout();
 
         $employer = Employer::factory()->create();
         $this->actingAs($employer->user)->get('/explore')->assertRedirect('/employer');

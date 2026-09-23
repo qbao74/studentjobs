@@ -10,7 +10,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
         rel="stylesheet" />
-    <link rel="stylesheet" href="{{ asset('jobly/css/style.css') }}?v=chat-wide-2" />
+    <link rel="stylesheet" href="{{ asset('jobly/css/style.css') }}?v={{ filemtime(public_path('jobly/css/style.css')) }}" />
 </head>
 
 <body data-page="@yield('page')">
@@ -25,13 +25,6 @@ has-rail
 @endif">
         <aside class="sidebar" id="sidebar"></aside>
         <main class="main">
-            @auth
-                <form method="POST" action="{{ route('logout') }}"
-                    style="display:flex;justify-content:flex-end;margin-bottom:12px;">
-                    @csrf
-                    <button class="btn btn-ghost btn-sm" type="submit">Đăng xuất</button>
-                </form>
-            @endauth
             @yield('content')
         </main>
         @hasSection('hide-rail')
@@ -44,10 +37,10 @@ has-rail
         window.JOBLY = @json($jobly);
     </script>
     <script src="https://unpkg.com/lucide@latest"></script>
-    <script src="{{ asset('jobly/js/auth.js') }}"></script>
-    <script src="{{ asset('jobly/js/data.js') }}"></script>
-    <script src="{{ asset('jobly/js/swipe.js') }}"></script>
-    <script src="{{ asset('jobly/js/app.js') }}"></script>
+    <script src="{{ asset('jobly/js/auth.js') }}?v={{ filemtime(public_path('jobly/js/auth.js')) }}"></script>
+    <script src="{{ asset('jobly/js/data.js') }}?v={{ filemtime(public_path('jobly/js/data.js')) }}"></script>
+    <script src="{{ asset('jobly/js/swipe.js') }}?v={{ filemtime(public_path('jobly/js/swipe.js')) }}"></script>
+    <script src="{{ asset('jobly/js/app.js') }}?v={{ filemtime(public_path('jobly/js/app.js')) }}"></script>
 </body>
 
 </html>

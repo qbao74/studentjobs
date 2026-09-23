@@ -4102,3 +4102,84 @@ button.is-loading {
   opacity: 0.6;
   pointer-events: none;
 }
+
+/* ------------------------------------------------------------
+   22 DỮ LIỆU THẬT — khối cho khách, điểm từng tiêu chí, thao tác trên đơn
+   ------------------------------------------------------------ */
+.guest-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.guest-actions .btn {
+  flex: 1;
+}
+
+.crit-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 14px 0 4px;
+}
+
+.crit-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) 30px;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.84rem;
+}
+
+.crit-row small {
+  color: var(--muted);
+}
+
+.crit-row strong {
+  text-align: right;
+}
+
+.crit-row .progress-bar span {
+  transition: none;
+}
+
+.crit-row.is-na {
+  grid-template-columns: auto 1fr;
+  color: var(--muted);
+}
+
+.why-box p.muted {
+  font-size: 0.84rem;
+}
+
+.card-stack:has(> .empty-deck) {
+  display: grid;
+  place-items: center;
+  height: auto;
+  min-height: 0;
+}
+
+.swipe-actions button:disabled {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+.app-card-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.t-step.is-rejected .t-dot {
+  border-color: var(--danger);
+  background: var(--danger);
+}
+
+.t-step.is-rejected strong {
+  color: var(--danger);
+}
+
+.sidebar-user-row form {
+  margin: 0;
+}
