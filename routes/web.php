@@ -1,5 +1,10 @@
 <?php
 
+use App\Http\Controllers\Admin\ApplicationController as AdminApplicationController;
+use App\Http\Controllers\Admin\CompanyController as AdminCompanyController;
+use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
+use App\Http\Controllers\Admin\JobController as AdminJobController;
+use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\Api\ApplicationController;
 use App\Http\Controllers\Api\BookmarkController;
 use App\Http\Controllers\Api\CvController;
@@ -8,6 +13,7 @@ use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\RegisterController;
 use App\Http\Controllers\CvDownloadController;
+use App\Http\Controllers\Employer\ApplicationController as EmployerApplicationController;
 use App\Http\Controllers\Employer\DashboardController as EmployerDashboardController;
 use App\Http\Controllers\Employer\JobPostController as EmployerJobPostController;
 use Illuminate\Support\Facades\Route;
@@ -70,6 +76,31 @@ Route::prefix('employer')->name('employer.')->middleware(['auth', 'role:employer
     Route::put('/jobs/{job}', [EmployerJobPostController::class, 'update'])->name('jobs.update');
     Route::patch('/jobs/{job}/status', [EmployerJobPostController::class, 'updateStatus'])->name('jobs.status');
     Route::delete('/jobs/{job}', [EmployerJobPostController::class, 'destroy'])->name('jobs.destroy');
+
+    Route::get('/applications', [EmployerApplicationController::class, 'index'])->name('applications.index');
+    Route::get('/applications/{application}', [EmployerApplicationController::class, 'show'])->name('applications.show');
+    Route::patch('/applications/{application}/status', [EmployerApplicationController::class, 'updateStatus'])->name('applications.status');
+    Route::post('/applications/{application}/messages', [EmployerApplicationController::class, 'storeMessage'])->middleware('throttle:30,1')->name('applications.messages.store');
+    Route::get('/chat', [EmployerApplicationController::class, 'chat'])->name('chat');
+});
+
+Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:admin'])->group(function () {
+    Route::get('/', AdminDashboardController::class)->name('dashboard');
+
+    Route::get('/users', [AdminUserController::class, 'index'])->name('users.index');
+    Route::get('/users/{user}', [AdminUserController::class, 'show'])->name('users.show');
+    Route::patch('/users/{user}/active', [AdminUserController::class, 'updateActive'])->name('users.active');
+
+    Route::get('/companies', [AdminCompanyController::class, 'index'])->name('companies.index');
+    Route::get('/companies/{company}', [AdminCompanyController::class, 'show'])->name('companies.show');
+    Route::patch('/companies/{company}/verified', [AdminCompanyController::class, 'updateVerified'])->name('companies.verified');
+
+    Route::get('/jobs', [AdminJobController::class, 'index'])->name('jobs.index');
+    Route::get('/jobs/{job}', [AdminJobController::class, 'show'])->name('jobs.show');
+    Route::patch('/jobs/{job}/status', [AdminJobController::class, 'updateStatus'])->name('jobs.status');
+
+    Route::get('/applications', [AdminApplicationController::class, 'index'])->name('applications.index');
+    Route::get('/applications/{application}', [AdminApplicationController::class, 'show'])->name('applications.show');
 });
 
 Route::middleware(['auth', 'role:student'])->group(function () {

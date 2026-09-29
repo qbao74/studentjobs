@@ -42,7 +42,13 @@ class JobPostManagementTest extends TestCase
         $this->actingAs($student->user)->get('/employer')->assertForbidden();
 
         $employer = Employer::factory()->create();
-        $this->actingAs($employer->user)->get('/employer')->assertOk()->assertSee($employer->company->name);
+        $this->actingAs($employer->user)
+            ->get('/employer')
+            ->assertOk()
+            ->assertSee($employer->company->name)
+            ->assertSee(route('employer.jobs.index', ['status' => 'open']), false)
+            ->assertSee(route('employer.applications.index', ['status' => 'pending']), false)
+            ->assertSee(route('employer.applications.index', ['status' => 'interview']), false);
     }
 
     public function test_employer_creates_job_with_skills_and_students_get_scores(): void

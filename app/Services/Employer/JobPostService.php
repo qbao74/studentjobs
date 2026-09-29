@@ -57,6 +57,13 @@ class JobPostService
         return $job;
     }
 
+    /** Quản trị viên được đặt mọi trạng thái, kể cả Ẩn. Điểm khớp được tính lại theo trạng thái mới. */
+    public function moderate(JobPost $job, JobStatus $status): void
+    {
+        $job->update(['status' => $status]);
+        $this->recommendations->refreshForJob($job);
+    }
+
     /** Nhà tuyển dụng chỉ đổi qua lại Mở ↔ Đóng; trạng thái Ẩn do admin quyết định. */
     public function setStatus(JobPost $job, JobStatus $status): void
     {

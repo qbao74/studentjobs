@@ -45,7 +45,7 @@
                             </td>
                             <td><span class="status-tag" data-status="{{ $job->status->value }}">{{ $job->status->label() }}</span></td>
                             <td>
-                                {{ $job->applications_count }}
+                                <a href="{{ route('employer.applications.index', ['job' => $job->id]) }}">{{ $job->applications_count }} đơn</a>
                                 @if ($job->pending_count)
                                     <span class="nav-badge">{{ $job->pending_count }} mới</span>
                                 @endif

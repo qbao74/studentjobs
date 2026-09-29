@@ -11,24 +11,24 @@
     </header>
 
     <div class="stats-grid panel-stats">
-        <div class="stat-card"><span class="stat-icon is-violet"><i data-lucide="briefcase"></i></span><strong>{{ $stats['openJobs'] }}</strong><span>Tin đang tuyển</span></div>
-        <div class="stat-card"><span class="stat-icon is-blue"><i data-lucide="users"></i></span><strong>{{ $stats['applications'] }}</strong><span>Tổng đơn nhận được</span></div>
-        <div class="stat-card"><span class="stat-icon is-pink"><i data-lucide="inbox"></i></span><strong>{{ $stats['pending'] }}</strong><span>Đơn chưa xem</span></div>
-        <div class="stat-card"><span class="stat-icon is-mint"><i data-lucide="calendar-check"></i></span><strong>{{ $stats['interview'] }}</strong><span>Đang phỏng vấn</span></div>
+        <a class="stat-card" href="{{ route('employer.jobs.index', ['status' => 'open']) }}"><span class="stat-icon is-violet"><i data-lucide="briefcase"></i></span><strong>{{ $stats['openJobs'] }}</strong><span>Tin đang tuyển</span></a>
+        <a class="stat-card" href="{{ route('employer.applications.index') }}"><span class="stat-icon is-blue"><i data-lucide="users"></i></span><strong>{{ $stats['applications'] }}</strong><span>Tổng đơn nhận được</span></a>
+        <a class="stat-card" href="{{ route('employer.applications.index', ['status' => 'pending']) }}"><span class="stat-icon is-pink"><i data-lucide="inbox"></i></span><strong>{{ $stats['pending'] }}</strong><span>Đơn chưa xem</span></a>
+        <a class="stat-card" href="{{ route('employer.applications.index', ['status' => 'interview']) }}"><span class="stat-icon is-mint"><i data-lucide="calendar-check"></i></span><strong>{{ $stats['interview'] }}</strong><span>Đang phỏng vấn</span></a>
     </div>
 
     <div class="panel-grid">
         <section class="card section">
             <h2>Đơn mới nhất</h2>
             @forelse ($recent as $application)
-                <div class="panel-row">
+                <a class="panel-row" href="{{ route('employer.applications.show', $application) }}">
                     <span class="avatar panel-avatar">{{ mb_strtoupper(mb_substr($application->student->user->name, 0, 1)) }}</span>
                     <div>
                         <strong>{{ $application->student->user->name }}</strong>
                         <small>{{ $application->jobPost->title }} · {{ $application->created_at->diffForHumans() }}</small>
                     </div>
                     <span class="status-tag" data-status="{{ $application->status->value }}">{{ $application->status->label() }}</span>
-                </div>
+                </a>
             @empty
                 <p class="muted">Chưa có ai ứng tuyển. Đăng tin để bắt đầu nhận hồ sơ.</p>
             @endforelse

@@ -1129,7 +1129,7 @@ function khoiTrangChat() {
   if (!layout) return;
   if (!CONVERSATIONS.length) {
     layout.innerHTML = `
-      <div class="card empty-deck" style="margin:40px auto">
+      <div class="card empty-deck">
         <div class="emoji">💬</div>
         <h2>Chưa có hội thoại</h2>
         <p>Mỗi đơn ứng tuyển là một hội thoại với nhà tuyển dụng. Ứng tuyển một việc để bắt đầu.</p>
