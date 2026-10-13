@@ -4,12 +4,17 @@ namespace App\Providers;
 
 use App\Enums\ApplicationStatus;
 use App\Enums\JobStatus;
+use App\Enums\PaymentStatus;
 use App\Enums\Role;
+use App\Enums\SupportTicketStatus;
 use App\Models\Application;
 use App\Models\Company;
 use App\Models\Employer;
 use App\Models\JobPost;
 use App\Models\Message;
+use App\Models\Payment;
+use App\Models\SupportTicket;
+use App\Models\UserNotification;
 use App\Services\Frontend\JoblyPayload;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
@@ -58,6 +63,9 @@ class AppServiceProvider extends ServiceProvider
                 ['route' => 'admin.companies.index', 'active' => 'admin.companies.*', 'label' => 'Công ty', 'icon' => 'building-2', 'badge' => Company::query()->where('verified', false)->count()],
                 ['route' => 'admin.jobs.index', 'active' => 'admin.jobs.*', 'label' => 'Tin tuyển dụng', 'icon' => 'briefcase', 'badge' => JobPost::query()->where('status', JobStatus::Hidden)->count()],
                 ['route' => 'admin.applications.index', 'active' => 'admin.applications.*', 'label' => 'Đơn ứng tuyển', 'icon' => 'inbox', 'badge' => Application::query()->where('status', ApplicationStatus::Pending)->count()],
+                ['route' => 'admin.payments.index', 'active' => 'admin.payments.*', 'label' => 'Thanh toán', 'icon' => 'wallet', 'badge' => Payment::query()->where('status', PaymentStatus::Pending)->count()],
+                ['route' => 'admin.support.index', 'active' => 'admin.support.*', 'label' => 'Hỗ trợ', 'icon' => 'life-buoy', 'badge' => SupportTicket::query()->whereIn('status', [SupportTicketStatus::Open, SupportTicketStatus::InProgress])->count()],
+                ['route' => 'notifications.index', 'active' => 'notifications.*', 'label' => 'Thông báo', 'icon' => 'bell', 'badge' => auth()->user()->userNotifications()->unread()->count()],
             ],
         ];
     }
@@ -82,6 +90,9 @@ class AppServiceProvider extends ServiceProvider
                 ['route' => 'employer.jobs.index', 'active' => 'employer.jobs.*', 'label' => 'Tin tuyển dụng', 'icon' => 'briefcase'],
                 ['route' => 'employer.applications.index', 'active' => 'employer.applications.*', 'label' => 'Đơn ứng tuyển', 'icon' => 'users', 'badge' => $pending],
                 ['route' => 'employer.chat', 'active' => 'employer.chat', 'label' => 'Tin nhắn', 'icon' => 'message-circle', 'badge' => $unread],
+                ['route' => 'employer.billing.index', 'active' => 'employer.billing.*', 'label' => 'Thanh toán', 'icon' => 'wallet', 'badge' => $employer->company->subscriptionState() === 'expired' || $employer->company->subscriptionState() === 'none' ? '!' : ($employer->company->isSubscriptionExpiringSoon() ? '!' : null)],
+                ['route' => 'support.index', 'active' => 'support.*', 'label' => 'Hỗ trợ', 'icon' => 'life-buoy'],
+                ['route' => 'notifications.index', 'active' => 'notifications.*', 'label' => 'Thông báo', 'icon' => 'bell', 'badge' => UserNotification::query()->where('user_id', $employer->user_id)->unread()->count()],
             ],
         ];
     }

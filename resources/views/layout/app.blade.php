@@ -25,6 +25,22 @@ has-rail
 @endif">
         <aside class="sidebar" id="sidebar"></aside>
         <main class="main">
+            @if (session('status'))
+                <div class="flash flash--ok" role="status"><i data-lucide="circle-check"></i>{{ session('status') }}</div>
+            @endif
+            @if ($errors->any())
+                <div class="flash flash--error" role="alert">
+                    <i data-lucide="circle-alert"></i>
+                    <div>
+                        <strong>Chưa lưu được, kiểm tra lại:</strong>
+                        <ul>
+                            @foreach ($errors->all() as $error)
+                                <li>{{ $error }}</li>
+                            @endforeach
+                        </ul>
+                    </div>
+                </div>
+            @endif
             @yield('content')
         </main>
         @hasSection('hide-rail')

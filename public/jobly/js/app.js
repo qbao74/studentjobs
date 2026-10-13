@@ -79,6 +79,9 @@ const NAV = [
   { id: "saved", href: "/explore?saved=1", label: "Đã lưu", icon: "heart", auth: true },
   { id: "applications", href: "/applications", label: "Đã apply", icon: "circle-check-big", auth: true },
   { id: "chat", href: "/chat", label: "Tin nhắn", icon: "message-circle", auth: true, badge: JOBLY.unread },
+  { id: "notifications", href: "/notifications", label: "Thông báo", icon: "bell", auth: true, badge: JOBLY.notificationUnread },
+  { id: "reviews", href: "/reviews/new", label: "Đánh giá", icon: "star", auth: true },
+  { id: "support", href: "/support", label: "Hỗ trợ", icon: "life-buoy", auth: true },
 ];
 
 // Bottom nav mobile: Home, Explore, Applications, Chat, Profile (không có mục Saved riêng)
@@ -467,6 +470,7 @@ const CotPhai = {
         <div class="stats-grid">
           <div class="stat-card"><span class="stat-icon is-violet">${htmlIcon("briefcase")}</span><strong>${company.jobsCount}</strong><span>Việc đang mở</span></div>
           <div class="stat-card"><span class="stat-icon is-mint">${htmlIcon("users")}</span><strong>${thoatHtml(company.followers)}</strong><span>Người theo dõi</span></div>
+          <div class="stat-card"><span class="stat-icon is-pink">${htmlIcon("star")}</span><strong>${company.reviews ? String(company.rating ?? "—") : "—"}</strong><span>${company.reviews || 0} đánh giá</span></div>
         </div>
       </section>`;
   },
@@ -1492,6 +1496,7 @@ function khoiTrangDon() {
           </div>
           <div class="app-card-actions">
             <a class="btn btn-soft btn-sm" href="/chat?c=${app.id}">${htmlIcon("message-circle")} Nhắn tin</a>
+            ${app.canReview ? `<a class="btn btn-soft btn-sm" href="${thoatHtml(app.reviewUrl)}">${htmlIcon("star")} Đánh giá công ty</a>` : ""}
             ${app.canWithdraw ? `<button class="btn btn-ghost btn-sm" type="button" data-withdraw="${app.id}">${htmlIcon("undo-2")} Rút đơn</button>` : ""}
           </div>
         </article>`;
@@ -1835,6 +1840,7 @@ function khoiTrangCongTy() {
           <div>
             <h1>${thoatHtml(company.name)} ${htmlXacThuc(company)}</h1>
             <p>${thoatHtml(company.tagline)} · ${thoatHtml(company.size)} · ${thoatHtml(company.location)}</p>
+            <p><a href="/companies/${encodeURIComponent(company.id)}/reviews">${company.reviews ? `${company.rating ?? "—"}/5 · ${company.reviews} đánh giá` : "Chưa có đánh giá"}</a></p>
           </div>
         </div>
         <div class="job-row-actions">

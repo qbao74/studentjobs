@@ -37,6 +37,16 @@ class Application extends Model
         return $this->hasOne(Message::class)->latestOfMany();
     }
 
+    public function recruiterNotes(): HasMany
+    {
+        return $this->hasMany(RecruiterNote::class);
+    }
+
+    public function review(): HasOne
+    {
+        return $this->hasOne(CompanyReview::class);
+    }
+
     protected function casts(): array
     {
         return [

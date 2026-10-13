@@ -4,6 +4,8 @@ use App\Http\Controllers\Admin\ApplicationController as AdminApplicationControll
 use App\Http\Controllers\Admin\CompanyController as AdminCompanyController;
 use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Admin\JobController as AdminJobController;
+use App\Http\Controllers\Admin\PaymentController as AdminPaymentController;
+use App\Http\Controllers\Admin\SupportTicketController as AdminSupportTicketController;
 use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\Api\ApplicationController;
 use App\Http\Controllers\Api\BookmarkController;
@@ -12,10 +14,15 @@ use App\Http\Controllers\Api\MessageController;
 use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\RegisterController;
+use App\Http\Controllers\CompanyReviewController;
 use App\Http\Controllers\CvDownloadController;
 use App\Http\Controllers\Employer\ApplicationController as EmployerApplicationController;
+use App\Http\Controllers\Employer\BillingController as EmployerBillingController;
 use App\Http\Controllers\Employer\DashboardController as EmployerDashboardController;
 use App\Http\Controllers\Employer\JobPostController as EmployerJobPostController;
+use App\Http\Controllers\Employer\RecruiterNoteController;
+use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\SupportTicketController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('guest')->group(function () {
@@ -38,6 +45,7 @@ Route::middleware('student.or.guest')->group(function () {
     Route::view('/explore', 'explore')->name('explore');
     Route::view('/jobs', 'jobs')->name('jobs');
     Route::view('/companies', 'companies')->name('companies');
+    Route::get('/companies/{company:slug}/reviews', [CompanyReviewController::class, 'index'])->name('companies.reviews.index');
 });
 
 /*
@@ -82,6 +90,15 @@ Route::prefix('employer')->name('employer.')->middleware(['auth', 'role:employer
     Route::patch('/applications/{application}/status', [EmployerApplicationController::class, 'updateStatus'])->name('applications.status');
     Route::post('/applications/{application}/messages', [EmployerApplicationController::class, 'storeMessage'])->middleware('throttle:30,1')->name('applications.messages.store');
     Route::get('/chat', [EmployerApplicationController::class, 'chat'])->name('chat');
+
+    Route::get('/billing', [EmployerBillingController::class, 'index'])->name('billing.index');
+    Route::post('/billing', [EmployerBillingController::class, 'store'])->middleware('throttle:10,1')->name('billing.store');
+    Route::get('/billing/{payment}', [EmployerBillingController::class, 'show'])->name('billing.show');
+    Route::post('/billing/{payment}/simulate', [EmployerBillingController::class, 'simulate'])->middleware('throttle:20,1')->name('billing.simulate');
+
+    Route::post('/applications/{application}/notes', [RecruiterNoteController::class, 'store'])->middleware('throttle:30,1')->name('notes.store');
+    Route::patch('/notes/{note}', [RecruiterNoteController::class, 'update'])->name('notes.update');
+    Route::delete('/notes/{note}', [RecruiterNoteController::class, 'destroy'])->name('notes.destroy');
 });
 
 Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:admin'])->group(function () {
@@ -101,6 +118,15 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:admin'])->grou
 
     Route::get('/applications', [AdminApplicationController::class, 'index'])->name('applications.index');
     Route::get('/applications/{application}', [AdminApplicationController::class, 'show'])->name('applications.show');
+
+    Route::get('/payments', [AdminPaymentController::class, 'index'])->name('payments.index');
+    Route::get('/payments/{payment}', [AdminPaymentController::class, 'show'])->name('payments.show');
+    Route::patch('/payments/{payment}', [AdminPaymentController::class, 'update'])->name('payments.update');
+
+    Route::get('/support', [AdminSupportTicketController::class, 'index'])->name('support.index');
+    Route::get('/support/{ticket}', [AdminSupportTicketController::class, 'show'])->name('support.show');
+    Route::post('/support/{ticket}/replies', [AdminSupportTicketController::class, 'reply'])->middleware('throttle:30,1')->name('support.reply');
+    Route::patch('/support/{ticket}/status', [AdminSupportTicketController::class, 'updateStatus'])->name('support.status');
 });
 
 Route::middleware(['auth', 'role:student'])->group(function () {
@@ -108,4 +134,20 @@ Route::middleware(['auth', 'role:student'])->group(function () {
     Route::view('/applications', 'applications')->name('applications');
     Route::view('/profile', 'profile')->name('profile');
     Route::view('/chat', 'chat')->name('chat');
+    Route::get('/reviews/new', [CompanyReviewController::class, 'create'])->name('reviews.create');
+    Route::post('/companies/{company:slug}/reviews', [CompanyReviewController::class, 'store'])->middleware('throttle:10,1')->name('companies.reviews.store');
+});
+
+Route::middleware('auth')->group(function () {
+    Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
+    Route::post('/notifications/read-all', [NotificationController::class, 'readAll'])->name('notifications.read-all');
+    Route::get('/notifications/{notification}/read', [NotificationController::class, 'read'])->name('notifications.read');
+    Route::get('/api/notifications/unread', [NotificationController::class, 'unreadCount'])->middleware('throttle:60,1')->name('api.notifications.unread');
+
+    Route::get('/support', [SupportTicketController::class, 'index'])->name('support.index');
+    Route::get('/support/create', [SupportTicketController::class, 'create'])->name('support.create');
+    Route::post('/support', [SupportTicketController::class, 'store'])->middleware('throttle:10,1')->name('support.store');
+    Route::get('/support/{ticket}', [SupportTicketController::class, 'show'])->name('support.show');
+    Route::post('/support/{ticket}/replies', [SupportTicketController::class, 'reply'])->middleware('throttle:30,1')->name('support.reply');
+    Route::patch('/support/{ticket}/close', [SupportTicketController::class, 'close'])->name('support.close');
 });

@@ -43,11 +43,15 @@ class JobPost extends Model
         return $this->hasMany(JobRecommendation::class);
     }
 
-    /** Tin sinh viên được thấy: đang mở. */
+    /** Tin sinh viên được thấy: đang mở và công ty còn hạn gói. */
     #[Scope]
     protected function open(Builder $query): void
     {
-        $query->where('status', JobStatus::Open);
+        $query->where('status', JobStatus::Open)
+            ->whereHas('company', function (Builder $company): void {
+                $company->whereNotNull('subscription_ends_at')
+                    ->where('subscription_ends_at', '>', now());
+            });
     }
 
     /** JSON trong DB → mảng PHP khi đọc. */

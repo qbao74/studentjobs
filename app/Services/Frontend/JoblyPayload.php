@@ -53,6 +53,7 @@ class JoblyPayload
             'saved' => [],
             'following' => [],
             'unread' => 0,
+            'notificationUnread' => 0,
             'skillOptions' => [],
         ];
 
@@ -76,7 +77,7 @@ class JoblyPayload
 
         $recs = $student->recommendations()->get()->keyBy('job_post_id');
         $applications = $student->applications()
-            ->with(['jobPost.company', 'messages' => fn ($q) => $q->latest()->limit(1)])
+            ->with(['jobPost.company', 'review', 'messages' => fn ($q) => $q->latest()->limit(1)])
             ->withCount(['messages as unread_count' => fn ($q) => $q->whereNull('read_at')->where('user_id', '!=', $user->id)])
             ->latest()
             ->get();
@@ -105,6 +106,7 @@ class JoblyPayload
             'saved' => $student->savedJobs()->pluck('job_posts.id')->all(),
             'following' => $student->followedCompanies()->pluck('companies.slug')->all(),
             'unread' => (int) $applications->sum('unread_count'),
+            'notificationUnread' => $user->userNotifications()->unread()->count(),
             'skillOptions' => Skill::orderBy('name')->pluck('name')->all(),
         ];
     }

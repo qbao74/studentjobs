@@ -196,8 +196,11 @@ class BulkDemoSeeder extends Seeder
                 'color' => $company['color'],
                 'initial' => mb_strtoupper(mb_substr($company['name'], 0, 1)),
                 'about' => $company['name'].' tuyển sinh viên part-time và thực tập. '.$company['tagline'].'. Lịch làm việc xếp theo tuần học.',
-                'rating' => 4.2 + ($index % 7) / 10,
-                'reviews_count' => 12 + ($index * 3),
+                'rating' => null,
+                'reviews_count' => 0,
+                'service_plan_id' => DB::table('service_plans')->where('code', 'standard')->value('id'),
+                'subscription_starts_at' => $now,
+                'subscription_ends_at' => $now->copy()->addDays(30),
                 'created_at' => $now,
                 'updated_at' => $now,
             ]);

@@ -3,10 +3,12 @@
 namespace App\Http\Controllers\Employer;
 
 use App\Enums\ApplicationStatus;
+use App\Enums\NotificationType;
 use App\Http\Controllers\Controller;
 use App\Models\Application;
 use App\Models\JobPost;
 use App\Services\MessageService;
+use App\Services\Notification\UserNotificationService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -17,7 +19,10 @@ use Illuminate\View\View;
 
 class ApplicationController extends Controller
 {
-    public function __construct(private MessageService $messages) {}
+    public function __construct(
+        private MessageService $messages,
+        private UserNotificationService $notifications,
+    ) {}
 
     public function index(Request $request): View
     {
@@ -48,8 +53,12 @@ class ApplicationController extends Controller
 
         $application->load(['student.user', 'student.skills', 'student.cv', 'jobPost']);
         $thread = $this->messages->thread($application, $request->user());
+        $notes = $application->recruiterNotes()
+            ->where('employer_id', $request->user()->employer->id)
+            ->latest()
+            ->get();
 
-        return view('employer.applications.show', compact('application', 'thread'));
+        return view('employer.applications.show', compact('application', 'thread', 'notes'));
     }
 
     public function updateStatus(Request $request, Application $application): RedirectResponse
@@ -60,7 +69,23 @@ class ApplicationController extends Controller
             'status' => ['required', Rule::in(ApplicationStatus::values())],
         ]);
 
-        $application->update(['status' => ApplicationStatus::from($data['status'])]);
+        $status = ApplicationStatus::from($data['status']);
+        $application->update(['status' => $status]);
+
+        if (in_array($status, [ApplicationStatus::Shortlisted, ApplicationStatus::Interview, ApplicationStatus::Hired, ApplicationStatus::Rejected], true)) {
+            $application->loadMissing('student.user', 'jobPost');
+            $this->notifications->notify(
+                $application->student->user,
+                NotificationType::ApplicationStatusChanged,
+                'application:'.$application->id.':status:'.$status->value,
+                [
+                    'title' => 'Đơn ứng tuyển: '.$status->label(),
+                    'body' => 'Tin "'.$application->jobPost->title.'" đã chuyển sang trạng thái '.$status->label().'.',
+                    'link' => route('applications'),
+                ],
+                $application,
+            );
+        }
 
         return back()->with('status', 'Đã cập nhật trạng thái đơn thành '.$application->status->label().'.');
     }

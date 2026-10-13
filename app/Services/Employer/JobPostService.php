@@ -28,6 +28,8 @@ class JobPostService
      */
     public function create(Company $company, array $data): JobPost
     {
+        $this->assertCanActivate($company);
+
         $job = DB::transaction(function () use ($company, $data) {
             $job = $company->jobPosts()->create([...$data['fields'], 'status' => JobStatus::Open]);
             $this->syncSkills($job, $data['skills']);
@@ -69,6 +71,10 @@ class JobPostService
     {
         if ($status === JobStatus::Hidden) {
             throw new UnprocessableEntityHttpException('Chỉ quản trị viên mới ẩn được tin.');
+        }
+
+        if ($status === JobStatus::Open && $job->status !== JobStatus::Open) {
+            $this->assertCanActivate($job->company);
         }
 
         $job->update(['status' => $status]);
@@ -141,5 +147,16 @@ class JobPostService
         }
 
         $job->unsetRelation('skills');
+    }
+
+    private function assertCanActivate(Company $company): void
+    {
+        if (! $company->hasActiveSubscription()) {
+            throw new UnprocessableEntityHttpException('Gói duy trì tin đã hết hạn hoặc chưa thanh toán. Hãy thanh toán trước khi đăng tin đang mở.');
+        }
+
+        if (! $company->canActivateAnotherJob()) {
+            throw new UnprocessableEntityHttpException('Gói hiện tại đã đủ số tin đang mở. Hãy đóng tin khác hoặc nâng gói.');
+        }
     }
 }

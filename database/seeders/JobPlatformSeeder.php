@@ -173,9 +173,15 @@ class JobPlatformSeeder extends Seeder
             ],
         ];
 
+        $planId = DB::table('service_plans')->where('code', 'standard')->value('id');
         $ids = [];
         foreach ($rows as $row) {
             $slug = $row['slug'];
+            $row['service_plan_id'] = $planId;
+            $row['subscription_starts_at'] = $now;
+            $row['subscription_ends_at'] = $now->copy()->addDays(30);
+            $row['rating'] = null;
+            $row['reviews_count'] = 0;
             $row['created_at'] = $now;
             $row['updated_at'] = $now;
             $ids[$slug] = DB::table('companies')->insertGetId($row);
@@ -522,7 +528,7 @@ class JobPlatformSeeder extends Seeder
                 'email' => 'quochuy@student.edu.vn',
                 'student' => ['school' => 'Đại học Bách Khoa', 'major' => 'Khoa học máy tính', 'year' => 'Sinh viên năm 4', 'bio' => 'Làm backend Laravel hơn một năm qua các dự án môn học.'],
                 'skills' => ['PHP', 'Laravel', 'SQL', 'Git', 'API'],
-                'apply' => [4 => 'shortlisted', 2 => 'rejected'],
+                'apply' => [4 => 'hired', 2 => 'rejected'],
             ],
         ];
 
@@ -554,13 +560,30 @@ class JobPlatformSeeder extends Seeder
             }
 
             foreach ($person['apply'] as $jobId => $status) {
-                DB::table('applications')->insert([
+                $applicationId = DB::table('applications')->insertGetId([
                     'student_id' => $studentId,
                     'job_post_id' => $jobId,
                     'status' => $status,
                     'created_at' => $now->copy()->subDays(3),
                     'updated_at' => $now,
                 ]);
+
+                if ($status === 'hired') {
+                    $companyId = DB::table('job_posts')->where('id', $jobId)->value('company_id');
+                    DB::table('company_reviews')->insert([
+                        'company_id' => $companyId,
+                        'student_id' => $studentId,
+                        'application_id' => $applicationId,
+                        'rating' => 5,
+                        'comment' => 'Được giao việc thật, mentor phản hồi nhanh. Phù hợp sinh viên muốn học backend.',
+                        'created_at' => $now,
+                        'updated_at' => $now,
+                    ]);
+                    DB::table('companies')->where('id', $companyId)->update([
+                        'rating' => 5.0,
+                        'reviews_count' => 1,
+                    ]);
+                }
             }
         }
     }

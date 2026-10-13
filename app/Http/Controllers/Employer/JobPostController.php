@@ -47,7 +47,11 @@ class JobPostController extends Controller
     {
         Gate::authorize('create', JobPost::class);
 
-        $job = $this->jobs->create($request->user()->employer->company, $request->jobData());
+        try {
+            $job = $this->jobs->create($request->user()->employer->company, $request->jobData());
+        } catch (UnprocessableEntityHttpException $e) {
+            return back()->withErrors(['title' => $e->getMessage()])->withInput();
+        }
 
         return redirect()->route('employer.jobs.index')->with('status', "Đã đăng tin \"{$job->title}\". Hệ thống đã tính điểm khớp với các sinh viên.");
     }
@@ -77,7 +81,11 @@ class JobPostController extends Controller
         ]);
         $status = JobStatus::from($data['status']);
 
-        $this->jobs->setStatus($job, $status);
+        try {
+            $this->jobs->setStatus($job, $status);
+        } catch (UnprocessableEntityHttpException $e) {
+            return back()->withErrors(['job' => $e->getMessage()]);
+        }
 
         return back()->with('status', $status === JobStatus::Open ? "Đã mở lại tin \"{$job->title}\"." : "Đã đóng tin \"{$job->title}\".");
     }

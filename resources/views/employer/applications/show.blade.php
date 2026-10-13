@@ -53,4 +53,6 @@
             @include('employer.partials.thread', ['application' => $application, 'thread' => $thread])
         </section>
     </div>
+
+    @include('employer.partials.notes', ['application' => $application, 'notes' => $notes])
 @endsection

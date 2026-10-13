@@ -2,6 +2,7 @@
 
 namespace App\Services\Frontend;
 
+use App\Enums\ApplicationStatus;
 use App\Enums\JobStatus;
 use App\Models\Application;
 use App\Models\Company;
@@ -85,6 +86,11 @@ class StudentPresenter
             'status' => $application->status->value,
             'statusLabel' => $application->status->label(),
             'canWithdraw' => ! $application->status->isFinal() && $application->status->step() <= 2,
+            'canReview' => $application->status === ApplicationStatus::Hired && $application->review === null,
+            'reviewUrl' => $application->status === ApplicationStatus::Hired
+                ? route('reviews.create', ['company' => $application->jobPost->company->slug])
+                : null,
+            'companySlug' => $application->jobPost->company->slug,
             'steps' => $application->status->timeline(),
         ];
     }

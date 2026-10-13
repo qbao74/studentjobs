@@ -54,4 +54,9 @@ class Student extends Model
     {
         return $this->belongsToMany(Company::class, 'company_follows')->withTimestamps();
     }
+
+    public function reviews(): HasMany
+    {
+        return $this->hasMany(CompanyReview::class);
+    }
 }
